@@ -2,10 +2,13 @@ import pandas as pd
 from snakemake.utils import validate
 import sys
 
-FASTQ_ROOT = "/path/to/downloaded/ontfastq/"
-ILLUMINA_ROOT = "/path/to/downloaded/illfastq/" # dont forget to add terminating '/', sorry i was lazy
+shell.executable('bash')
 
-samples = pd.read_table("samples.cfg").set_index("uuid", drop=False)
+# Import config
+configfile: "config.yaml"
+
+# Load manifest(s)
+samples = pd.read_table("manifest.cfg").set_index("uuid", drop=False)
 illumina_lookup = pd.read_table("reads.cfg").set_index("ont", drop=False)
 
 def unroll_assemblies(w, name, unroll=True):
@@ -26,13 +29,15 @@ def unroll_assemblies(w, name, unroll=True):
         return [name] + unroll_assemblies(w, ".".join(polishes[:-1] + ["-".join(end_polish_f)]))
 
 def enumerate_assemblies(w=None, suffix="", unroll=True):
-    base_assemblies = expand("{uuid}.ctg.cns"+suffix, uuid=[uuid for uuid in samples["uuid"]])
-
+    base_assemblies = []
     polished_assemblies = []
-    for uuid in [uuid for uuid in samples["uuid"] if samples.loc[uuid]["poa"] != '-']:
-        unrolled = unroll_assemblies(w, samples.loc[uuid]["poa"], unroll=unroll)
-        context = ['%s.ctg.cns.%s%s' % (uuid, step, suffix) for step in unrolled]
-        polished_assemblies.extend(context)
+    for uuid in samples["uuid"]:
+        for assembler in samples.loc[uuid]["assemblers"].split(","):
+            base_assemblies.append( "%s.%s.ctg.cns%s" % (uuid, assembler, suffix) )
+            if samples.loc[uuid]["poa"] != '-':
+                unrolled = unroll_assemblies(w, samples.loc[uuid]["poa"], unroll=unroll)
+                context = ['%s.%s.ctg.cns.%s%s' % (uuid, assembler, step, suffix) for step in unrolled]
+                polished_assemblies.extend(context)
     return base_assemblies+polished_assemblies
 
 for a in enumerate_assemblies(suffix=".fa"):
@@ -56,7 +61,7 @@ rule finish:
         web_html="index.html",
         web_pngs="png.tar",
         kraken="kraken_summary.bond.tsv",
-        polished=[ uuid+'.ctg.cns.'+samples.loc[uuid]["poa"]+'.fa' for uuid in samples["uuid"] if samples.loc[uuid]["poa"] != '-' ],
+        polished=enumerate_assemblies(unroll=False, suffix=".fa")
 
 rule mkdir_checkm:
     output: directory('checkm')
@@ -124,11 +129,11 @@ rule merge_checkm:
 
 def input_polish(w, name):
     if int(w.iteration) > 1:
-        contigs = "%s.ctg.cns.%s%s-%s-%d.fa" % (w.uuid, w.polishedprefix, name, w.readtype, int(w.iteration)-1)
+        contigs = "%s.%s.ctg.cns.%s%s-%s-%d.fa" % (w.uuid, w.assembler, w.polishedprefix, name, w.readtype, int(w.iteration)-1)
     elif w.polishedprefix=="":
-        contigs = "%s.ctg.cns.fa" % (w.uuid)
+        contigs = "%s.%s.ctg.cns.fa" % (w.uuid, w.assembler)
     else:
-        contigs = "%s.ctg.cns.%sfa" % (w.uuid, w.polishedprefix)
+        contigs = "%s.%s.ctg.cns.%sfa" % (w.uuid, w.assembler, w.polishedprefix)
     return contigs
 
 def input_polish_racon(w):
@@ -157,7 +162,7 @@ rule polish_racon:
     params:
         mode=minimap2_mode,
     output:
-        "{uuid}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
+        "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
         "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -t {threads} {input.reads} {output}.paf {input.contigs} > {output}"
@@ -167,7 +172,7 @@ rule polish_medaka:
     params:
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
     output:
-        "{uuid}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
+        "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
         "rm -rf medaka-{wildcards.uuid}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{wildcards.uuid} -t {threads} -m {params.model}; mv medaka-{wildcards.uuid}/consensus.fasta {output}"
@@ -181,7 +186,7 @@ rule polish_pilon:
     params:
         mode=minimap2_mode,
     output:
-        polish="{uuid}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
+        polish="{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
         "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
@@ -273,14 +278,30 @@ rule kraken:
     shell:
         "kraken2 --db databases/kraken2-microbial-fatfree --use-names -t {threads} --output {output} {input.fa}"
 
+def pick_wtdbg2_version(assembler):
+    lookup = {
+        "wtdbg2": "bin/wtdbg2",
+        "wtdbg2_2-4.": "bin/wtdbg2_2-4",
+    }
+    return lookup[assembler]
+
+def pick_wtdbg2_cns_version(assembler):
+    lookup = {
+        "wtdbg2": "bin/wtpoa-cns",
+        "wtdbg2_2-4.": "bin/wtpoa-cns_2-4",
+    }
+    return lookup[assembler]
+
 rule wtdbg2_consensus:
     input:
-        "{uuid}.ctg.lay.gz"
+        "{uuid}.{assembler}.ctg.lay.gz"
     output:
-        "{uuid}.ctg.cns.fa"
+        "{uuid}.{assembler}.ctg.cns.fa"
+    params:
+        cnsbin=lambda w: pick_wtdbg2_cns_version(w.assembler)
     threads: 12
     shell:
-        "git/wtdbg2/wtpoa-cns -f -i {input} -o {output} -t {threads}"
+        "{params.cnsbin} -f -i {input} -o {output} -t {threads}"
 
 # new and improved version of this rule doesn't fucking nuke your input reads
 rule subset_reads:
@@ -296,14 +317,18 @@ rule subset_reads:
 rule install_wtdbg2:
     output:
         ok=touch("w2.ok"),
-        w2_bin="git/wtdbg2/wtdbg2",
-        cns_bin="git/wtdbg2/wtpoa-cns"
-    shell: "cd git; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard 904f2b3ebdaa1e6f268cc58937767891a00d5bcb; make;"
+        d=directory("git/wtdbg2"),
+        w2_bin_904f2b3="bin/wtdbg2",
+        cns_bin_904f2b3="bin/wtpoa-cns",
+        w2_bin_6a0691e="bin/wtdbg2_2-4",
+        cns_bin_6a0691e="bin/wtpoa-cns_2-4"
+    shell: "cd git; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard 904f2b3ebdaa1e6f268cc58937767891a00d5bcb; make; cp wtdbg2 ../../bin; cp wtpoa-cns ../../bin; git reset --hard 6a0691e308b3644b6f718a03679f697d058e2be6; make; cp wtdbg2 ../../bin/wtdbg2_2-4; cp wtpoa-cns ../../bin/wtpoa-cns_2-4;"
 
 rule wtdbg2_assembly:
     input:
         reads=lambda w: FASTQ_ROOT + samples.loc[w.uuid]['reads'], ready="w2.ok"
     params:
+        abin=lambda w: pick_wtdbg2_version(w.assembler),
         prefix=lambda w: samples.loc[w.uuid]['uuid'],
         pmer=lambda w: samples.loc[w.uuid]['pmer'],
         sampler=lambda w: samples.loc[w.uuid]['sampler'],
@@ -312,8 +337,8 @@ rule wtdbg2_assembly:
         max_k=lambda w: samples.loc[w.uuid]['max_k'],
         max_node=lambda w: samples.loc[w.uuid]['max_node'],
     output:
-        "{uuid}.ctg.lay.gz"
+        "{uuid}.{assembler}.ctg.lay.gz"
     threads: 24
     shell:
-        "git/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
+        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
 
