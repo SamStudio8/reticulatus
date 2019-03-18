@@ -1,0 +1,4 @@
+long_fq_root:
+    "path/to/long/reads"
+short_fq_root:
+    "path/to/short/reads"
