@@ -6,7 +6,7 @@ A long snake for a long assemblies
 #### Setup the environment
 
 ```
-conda env create --name reticulatus --file environment.yaml
+conda env create --name reticulatus --file environments/base.yaml
 conda activate reticulatus
 ```
 
