@@ -11,6 +11,7 @@ configfile: "config.yaml"
 samples = pd.read_table("manifest.cfg").set_index("uuid", drop=False)
 illumina_lookup = pd.read_table("reads.cfg").set_index("ont", drop=False)
 
+# Utility functions
 def unroll_assemblies(w, name, unroll=True):
     if not unroll:
         return [name]
@@ -42,8 +43,6 @@ def enumerate_assemblies(w=None, suffix="", unroll=True):
 
 for a in enumerate_assemblies(suffix=".fa"):
     sys.stderr.write("*\t%s\n" % a)
-
-shell.executable('bash')
 
 GENOMES = [
     "bacillus_subtilis",
@@ -152,9 +151,9 @@ def minimap2_mode(w):
 
 def polish_reads_input(w):
     if w.readtype == "ont":
-        reads = FASTQ_ROOT + samples.loc[w.uuid]['reads']
+        reads = config["long_fq_root"] + samples.loc[w.uuid]['reads']
     elif w.readtype == "ill":
-        reads = expand(ILLUMINA_ROOT+"{fq}", fq=[illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i1"], illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i2"]])
+        reads = expand(config["short_fq_root"]+"{fq}", fq=[illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i1"], illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i2"]])
     return reads
 
 rule polish_racon:
@@ -306,9 +305,9 @@ rule wtdbg2_consensus:
 # new and improved version of this rule doesn't fucking nuke your input reads
 rule subset_reads:
     input:
-        FASTQ_ROOT + "{fq}.fq.gz"
+        config["long_fq_root"] + "{fq}.fq.gz"
     output:
-        FASTQ_ROOT + "{fq}.subset.{ratio}.fq.gz"
+        config["long_fq_root"] + "{fq}.subset.{ratio}.fq.gz"
     params:
         ratio=lambda w: float(w.ratio)/100
     shell:
@@ -326,7 +325,7 @@ rule install_wtdbg2:
 
 rule wtdbg2_assembly:
     input:
-        reads=lambda w: FASTQ_ROOT + samples.loc[w.uuid]['reads'], ready="w2.ok"
+        reads=lambda w: config["long_fq_root"] + samples.loc[w.uuid]['reads'], ready="w2.ok"
     params:
         abin=lambda w: pick_wtdbg2_version(w.assembler),
         prefix=lambda w: samples.loc[w.uuid]['uuid'],
