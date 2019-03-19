@@ -8,8 +8,8 @@ shell.executable('bash')
 configfile: "config.yaml"
 
 # Load manifest(s)
-samples = pd.read_table("manifest.cfg").set_index("uuid", drop=False)
-illumina_lookup = pd.read_table("reads.cfg").set_index("ont", drop=False)
+samples = pd.read_table("manifest.cfg").set_index("uuid", drop=False)     # defines the assembly and polishing strategies
+illumina_lookup = pd.read_table("reads.cfg").set_index("ont", drop=False) # provides a lookup of short reads for polishing
 
 # Utility functions
 def unroll_assemblies(w, name, unroll=True):
@@ -39,7 +39,7 @@ def enumerate_assemblies(w=None, suffix="", unroll=True):
                 unrolled = unroll_assemblies(w, samples.loc[uuid]["poa"], unroll=unroll)
                 context = ['%s.%s.ctg.cns.%s%s' % (uuid, assembler, step, suffix) for step in unrolled]
                 polished_assemblies.extend(context)
-    return base_assemblies+polished_assemblies
+    return base_assemblies + polished_assemblies
 
 for a in enumerate_assemblies(suffix=".fa"):
     sys.stderr.write("*\t%s\n" % a)
@@ -68,7 +68,7 @@ rule mkdir_checkm:
 
 rule setup_checkm:
     input: directory('checkm')
-    conda: "checkm.yaml"
+    conda: "environments/checkm.yaml"
     output: "checkm_setup.ok"
     shell: "python --version; echo 'checkm/' | checkm data setRoot 'checkm/'; touch checkm_setup.ok;"
 
@@ -151,9 +151,9 @@ def minimap2_mode(w):
 
 def polish_reads_input(w):
     if w.readtype == "ont":
-        reads = config["long_fq_root"] + samples.loc[w.uuid]['reads']
+        reads = os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads'])
     elif w.readtype == "ill":
-        reads = expand(config["short_fq_root"]+"{fq}", fq=[illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i1"], illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i2"]])
+        reads = expand(os.path.join(config["short_fq_root"], "{fq}"), fq=[illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i1"], illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i2"]])
     return reads
 
 rule polish_racon:
@@ -277,7 +277,7 @@ rule kraken:
     shell:
         "kraken2 --db databases/kraken2-microbial-fatfree --use-names -t {threads} --output {output} {input.fa}"
 
-def pick_wtdbg2_version(assembler):
+def pick_assembler_version(assembler):
     lookup = {
         "wtdbg2": "bin/wtdbg2",
         "wtdbg2_2-4.": "bin/wtdbg2_2-4",
@@ -305,9 +305,9 @@ rule wtdbg2_consensus:
 # new and improved version of this rule doesn't fucking nuke your input reads
 rule subset_reads:
     input:
-        config["long_fq_root"] + "{fq}.fq.gz"
+        os.path.join(config["long_fq_root"], "{fq}.fq.gz")
     output:
-        config["long_fq_root"] + "{fq}.subset.{ratio}.fq.gz"
+        os.path.join(config["long_fq_root"], "{fq}.subset.{ratio}.fq.gz")
     params:
         ratio=lambda w: float(w.ratio)/100
     shell:
@@ -325,9 +325,10 @@ rule install_wtdbg2:
 
 rule wtdbg2_assembly:
     input:
-        reads=lambda w: config["long_fq_root"] + samples.loc[w.uuid]['reads'], ready="w2.ok"
+        reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
+        ready="w2.ok"
     params:
-        abin=lambda w: pick_wtdbg2_version(w.assembler),
+        abin=lambda w: pick_assembler_version(w.assembler),
         prefix=lambda w: samples.loc[w.uuid]['uuid'],
         pmer=lambda w: samples.loc[w.uuid]['pmer'],
         sampler=lambda w: samples.loc[w.uuid]['sampler'],
@@ -336,8 +337,34 @@ rule wtdbg2_assembly:
         max_k=lambda w: samples.loc[w.uuid]['max_k'],
         max_node=lambda w: samples.loc[w.uuid]['max_node'],
     output:
-        "{uuid}.{assembler}.ctg.lay.gz"
+        "{uuid}.{assembler,^wtdbg2[A-z0-9._-]*}.ctg.lay.gz"
     threads: 24
     shell:
         "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
 
+rule install_flye:
+    output:
+        ok=touch("flye.ok"),
+        d=directory("git/Flye"),
+        flye_bin="bin/flye",
+    shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard b3cfc9d96798307dfe91bfc1543de0dcba944cbf; make; cp bin/flye ../../bin;"
+
+rule flye_assembly:
+    conda: "environments/flye.yaml"
+    input:
+        reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
+        ready="flye.ok"
+    params:
+        genome_size=0,
+        d = "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/"
+    output:
+        fa = "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/assembly.fasta"
+        gfa = "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/assembly.gfa"
+    threads: 24
+    shell:
+        "bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genomesize} -o {params.d} -t {threads}"
+
+rule link_flye_assembly:
+    input: "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/assembly.fasta"
+    output: "{uuid}.{assembler,^flye[A-z0-9._-]*}.ctg.cns.fa"
+    shell: "ln -s {input} {output}"
