@@ -7,9 +7,15 @@ shell.executable('bash')
 # Import config
 configfile: "config.yaml"
 
+# Set working dir to "working/", you can change this to anything.
+# The rationale is you can git clone the pipeline and run it without doing any juggling.
+# Note that most things need to be prefixed with ../ to refer to the current directory,
+# but there are exceptions like when reading cfg files and conda environments.
+workdir: "working/"
+
 # Load manifest(s)
-samples = pd.read_table("manifest.cfg").set_index("uuid", drop=False)     # defines the assembly and polishing strategies
-illumina_lookup = pd.read_table("reads.cfg").set_index("ont", drop=False) # provides a lookup of short reads for polishing
+samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)     # defines the assembly and polishing strategies
+illumina_lookup = pd.read_table("../reads.cfg").set_index("ont", drop=False) # provides a lookup of short reads for polishing
 
 # Utility functions
 def unroll_assemblies(w, name, unroll=True):
@@ -107,7 +113,7 @@ rule checkm:
         bin=directory("checkm-bins/{assembly}/{genome}/"),
         log="checkm-results/{assembly}/{genome}.tsv",
     params: p=checkm_pick_taxon
-    conda: "checkm.yaml"
+    conda: "environments/checkm.yaml"
     threads: 8
     shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.log}"
 
@@ -194,7 +200,7 @@ rule tabulate_minidot:
     input:
         stat="assembly_stats.txt",
         meta="assembly_md5size.txt",
-        manifest="samples.cfg",
+        manifest="../manifest.cfg",
         dots=expand("minidotplots/{assembly}.{genome}.png", assembly=enumerate_assemblies(), genome=GENOMES),
         checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies())
     output:
@@ -263,10 +269,10 @@ rule summarise_kraken:
 rule download_kraken_database:
     output:
         ok=touch("k2db.ok"),
-        h="databases/kraken2-microbial-fatfree/hash.k2d",
-        o="databases/kraken2-microbial-fatfree/opts.k2d",
-        t="databases/kraken2-microbial-fatfree/taxo.k2d",
-    shell: "cd databases/; bash go.sh"
+        h=os.path.join(config["database_root"], "hash.k2d"),
+        o=os.path.join(config["database_root"], "opts.k2d"),
+        t=os.path.join(config["database_root"], "taxo.k2d"),
+    shell: "cd %s; wget https://raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/databases/go.sh; bash go.sh" % config["database_root"]
 
 rule kraken:
     input:
@@ -275,19 +281,19 @@ rule kraken:
         "{uuid}.{prefix}.fa.k2"
     threads: 8
     shell:
-        "kraken2 --db databases/kraken2-microbial-fatfree --use-names -t {threads} --output {output} {input.fa}"
+        "kraken2 --db %s --use-names -t {threads} --output {output} {input.fa}" % config["database_root"]
 
 def pick_assembler_version(assembler):
     lookup = {
         "wtdbg2": "bin/wtdbg2",
-        "wtdbg2_2-4.": "bin/wtdbg2_2-4",
+        "wtdbg2_2-4": "bin/wtdbg2_2-4",
     }
     return lookup[assembler]
 
 def pick_wtdbg2_cns_version(assembler):
     lookup = {
         "wtdbg2": "bin/wtpoa-cns",
-        "wtdbg2_2-4.": "bin/wtpoa-cns_2-4",
+        "wtdbg2_2-4": "bin/wtpoa-cns_2-4",
     }
     return lookup[assembler]
 
@@ -295,7 +301,7 @@ rule wtdbg2_consensus:
     input:
         "{uuid}.{assembler}.ctg.lay.gz"
     output:
-        "{uuid}.{assembler}.ctg.cns.fa"
+        "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
     params:
         cnsbin=lambda w: pick_wtdbg2_cns_version(w.assembler)
     threads: 12
@@ -337,7 +343,7 @@ rule wtdbg2_assembly:
         max_k=lambda w: samples.loc[w.uuid]['max_k'],
         max_node=lambda w: samples.loc[w.uuid]['max_node'],
     output:
-        "{uuid}.{assembler,^wtdbg2[A-z0-9._-]*}.ctg.lay.gz"
+        "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     threads: 24
     shell:
         "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
@@ -349,22 +355,23 @@ rule install_flye:
         flye_bin="bin/flye",
     shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard b3cfc9d96798307dfe91bfc1543de0dcba944cbf; make; cp bin/flye ../../bin;"
 
+# TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
 rule flye_assembly:
     conda: "environments/flye.yaml"
     input:
         reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
         ready="flye.ok"
     params:
-        genome_size=0,
-        d = "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/"
+        genomesize="62m",
+        d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
     output:
-        fa = "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/assembly.fasta"
-        gfa = "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/assembly.gfa"
-    threads: 24
+        fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
+        gfa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.gfa"
+    threads: 48
     shell:
-        "bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genomesize} -o {params.d} -t {threads}"
+        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genomesize} -o {params.d} -t {threads}"
 
 rule link_flye_assembly:
-    input: "flye-{uuid}.{assembler,^flye[A-z0-9._-]*}/assembly.fasta"
-    output: "{uuid}.{assembler,^flye[A-z0-9._-]*}.ctg.cns.fa"
+    input: "{uuid}.{assembler}/assembly.fasta"
+    output: "{uuid}.{assembler,flye[A-z0-9._-]*}.ctg.cns.fa"
     shell: "ln -s {input} {output}"
