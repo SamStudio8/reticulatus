@@ -335,7 +335,7 @@ rule wtdbg2_assembly:
         ready="w2.ok"
     params:
         abin=lambda w: pick_assembler_version(w.assembler),
-        prefix=lambda w: samples.loc[w.uuid]['uuid'],
+        prefix=lambda w: w.uuid+'.'+w.assembler,
         pmer=lambda w: samples.loc[w.uuid]['pmer'],
         sampler=lambda w: samples.loc[w.uuid]['sampler'],
         edge=lambda w: samples.loc[w.uuid]['edge'],
