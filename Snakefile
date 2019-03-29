@@ -127,7 +127,7 @@ rule summarise_assembly_stats:
     output:
         "assembly_stats.txt"
     shell:
-        "for fa in {input}; do perl scripts/assembly-stats.pl $fa; done > {output}"
+        "for fa in {input}; do perl ../scripts/assembly-stats.pl $fa; done > {output}"
 
 rule summarise_assembly_meta:
     input:
@@ -143,7 +143,7 @@ rule bond_summarise_kraken:
     output:
         "kraken_summary.bond.tsv"
     shell:
-        "bond {input} samples.cfg > {output}"
+        "bond {input} ../manifest.cfg > {output}"
 
 rule summarise_kraken:
     input:
@@ -151,7 +151,7 @@ rule summarise_kraken:
     output:
         "kraken_summary.tsv"
     shell:
-        "python scripts/extracken2.py {input} > {output}"
+        "python ../scripts/extracken2.py {input} > {output}"
 
 rule download_kraken_database:
     output:
@@ -240,17 +240,17 @@ rule wtdbg2_24_assembly:
         reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
         ready="w2.ok"
     params:
-        abin=lambda w: pick_wtdbg2_version(w.assembler),
-        prefix=lambda w: samples.loc[w.uuid]['uuid']+'.'+w.assembler.replace(".",""),
+        abin=lambda w: pick_assembler_version(w.assembler),
+        prefix=lambda w: w.uuid+'.'+w.assembler,
         pmer=lambda w: samples.loc[w.uuid]['pmer'],
         sampler=lambda w: samples.loc[w.uuid]['sampler'],
         edge=lambda w: samples.loc[w.uuid]['edge'],
         length=lambda w: samples.loc[w.uuid]['length'],
         max_k=lambda w: samples.loc[w.uuid]['max_k'],
         max_node=lambda w: samples.loc[w.uuid]['max_node'],
-        genom_size=config["genome_size"],
+        genome_size=config["genome_size"],
     output:
-        "{uuid}.{assembler,wtdbg2[A-z0-9._-]*}ctg.lay.gz"
+        "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     threads: 24
     shell:
         "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -t {threads} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size}"
