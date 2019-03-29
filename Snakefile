@@ -95,7 +95,7 @@ rule polish_racon:
         "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
-        "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -t {threads} {input.reads} {output}.paf {input.contigs} > {output}"
+        "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {output}.paf {input.contigs} > {output}"
 
 rule polish_medaka:
     input: contigs=input_polish_medaka, reads=polish_reads_input
