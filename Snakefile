@@ -237,7 +237,8 @@ rule wtdbg2_assembly:
 
 rule wtdbg2_24_assembly:
     input:
-        reads=lambda w: FASTQ_ROOT + samples.loc[w.uuid]['reads'], ready="w2.ok"
+        reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
+        ready="w2.ok"
     params:
         abin=lambda w: pick_wtdbg2_version(w.assembler),
         prefix=lambda w: samples.loc[w.uuid]['uuid']+'.'+w.assembler.replace(".",""),
