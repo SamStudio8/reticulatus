@@ -224,6 +224,7 @@ rule wtdbg2_assembly:
         abin=lambda w: pick_assembler_version(w.assembler),
         prefix=lambda w: w.uuid+'.'+w.assembler,
         pmer=lambda w: samples.loc[w.uuid]['pmer'],
+        kmer=lambda w: samples.loc[w.uuid]['kmer'],
         sampler=lambda w: samples.loc[w.uuid]['sampler'],
         edge=lambda w: samples.loc[w.uuid]['edge'],
         length=lambda w: samples.loc[w.uuid]['length'],
@@ -233,7 +234,7 @@ rule wtdbg2_assembly:
         "{uuid}.{assembler,wtdbg2}.ctg.lay.gz"
     threads: 24
     shell:
-        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
+        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
 
 rule wtdbg2_24_assembly:
     input:
@@ -243,6 +244,7 @@ rule wtdbg2_24_assembly:
         abin=lambda w: pick_assembler_version(w.assembler),
         prefix=lambda w: w.uuid+'.'+w.assembler,
         pmer=lambda w: samples.loc[w.uuid]['pmer'],
+        kmer=lambda w: samples.loc[w.uuid]['kmer'],
         sampler=lambda w: samples.loc[w.uuid]['sampler'],
         edge=lambda w: samples.loc[w.uuid]['edge'],
         length=lambda w: samples.loc[w.uuid]['length'],
@@ -253,7 +255,7 @@ rule wtdbg2_24_assembly:
         "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     threads: 24
     shell:
-        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -p {params.pmer} -L {params.length} -t {threads} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size}"
+        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -t {threads} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size}"
 
 rule install_flye:
     output:
@@ -269,14 +271,14 @@ rule flye_assembly:
         reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
         ready="flye.ok"
     params:
-        genomesize="62m",
+        genome_size=config["genome_size"],
         d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
     output:
         fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
         gfa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.gfa"
     threads: 48
     shell:
-        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genomesize} -o {params.d} -t {threads}"
+        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads}"
 
 rule link_flye_assembly:
     input: "{uuid}.{assembler}/assembly.fasta"
