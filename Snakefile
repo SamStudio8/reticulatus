@@ -262,7 +262,7 @@ rule install_flye:
         ok=touch("flye.ok"),
         d=directory("git/Flye"),
         flye_bin="bin/flye",
-    shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard b3cfc9d96798307dfe91bfc1543de0dcba944cbf; make; cp bin/flye ../../bin;"
+    shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard eb89c9ef000f6dbcea426dcb430db92290546196; make; cp bin/flye ../../bin;"
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
 rule flye_assembly:
