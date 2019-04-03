@@ -275,7 +275,6 @@ rule flye_assembly:
         d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
     output:
         fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
-        gfa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.gfa"
     threads: 48
     shell:
         "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads}"
