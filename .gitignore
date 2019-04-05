@@ -1,0 +1,4 @@
+manifest.cfg
+config.yaml
+working/
+.snakemake
