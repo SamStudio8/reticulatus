@@ -155,7 +155,7 @@ rule summarise_kraken:
 
 rule download_kraken_database:
     output:
-        ok=touch("k2db.ok"),
+        ok=touch(os.path.join(config["database_root"], "k2db.ok")),
         h=os.path.join(config["database_root"], "hash.k2d"),
         o=os.path.join(config["database_root"], "opts.k2d"),
         t=os.path.join(config["database_root"], "taxo.k2d"),
@@ -163,7 +163,7 @@ rule download_kraken_database:
 
 rule kraken:
     input:
-        fa="{uuid}.{prefix}.fa", ok="k2db.ok"
+        fa="{uuid}.{prefix}.fa", ok=os.path.join(config["database_root"], "k2db.ok")
     output:
         "{uuid}.{prefix}.fa.k2"
     threads: 8
