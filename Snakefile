@@ -271,13 +271,14 @@ rule flye_assembly:
         reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
         ready="flye.ok"
     params:
+        overlap=lambda w: '-m %d' % samples.loc[w.uuid]['flyem'] if samples.loc[w.uuid]['flyem'] != '-' else '',
         genome_size=config["genome_size"],
         d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
     output:
         fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
-    threads: 48
+    threads: 36
     shell:
-        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads}"
+        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap}"
 
 rule link_flye_assembly:
     input: "{uuid}.{assembler}/assembly.fasta"
