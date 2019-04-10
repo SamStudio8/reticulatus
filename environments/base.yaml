@@ -18,3 +18,4 @@ dependencies:
   - pip:
     - medaka
     - git+https://github.com/SamStudio8/bondage.git
+    - git+https://github.com/SamStudio8/dehumanizer.git
