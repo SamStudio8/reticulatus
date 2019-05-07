@@ -25,6 +25,7 @@ onsuccess:
                     "chat.postMessage", channel=config["slack_channel"],
                     attachments= [{
                         "title": "Snakemake pipeline completed successfully",
+                        "color": "#36a64f",
                         "text": "Hooray!",
                         "footer": "Completed pipeline spotted by SnakeEyes",
                         "footer_icon": "https://avatars.slack-edge.com/2019-05-07/627979128852_e1d616abbd7312343db8_512.png",
@@ -45,6 +46,7 @@ onerror:
                     "chat.postMessage", channel=config["slack_channel"],
                     attachments= [{
                         "title": "Snakemake pipeline terminated unexpectedly",
+                        "color": "#e20b00",
                         "text": "Boo :(",
                         "footer": "Trashed pipeline spotted by SnakeEyes",
                         "footer_icon": "https://avatars.slack-edge.com/2019-05-07/627979128852_e1d616abbd7312343db8_512.png",
