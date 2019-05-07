@@ -13,7 +13,7 @@ conda activate reticulatus
 #### Select a workflow
 
 ```
-cp Snakemake-[base|full] Snakemake
+cp Snakefile-[base|full] Snakefile
 ```
 
 #### Engage the pipeline
