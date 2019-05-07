@@ -1,6 +1,7 @@
 import pandas as pd
 from snakemake.utils import validate
 import sys
+import time
 
 shell.executable('bash')
 
@@ -12,6 +13,46 @@ configfile: "config.yaml"
 # Note that most things need to be prefixed with ../ to refer to the current directory,
 # but there are exceptions like when reading cfg files and conda environments.
 workdir: "working/"
+
+onsuccess:
+    if config["slack_token"]:
+        try:
+            from slackclient import SlackClient
+
+            token = config["slack_token"]
+            sc = SlackClient(token)
+            sc.api_call(
+                    "chat.postMessage", channel=config["slack_channel"],
+                    attachments= [{
+                        "title": "Snakemake pipeline completed successfully",
+                        "text": "Hooray!",
+                        "footer": "Completed pipeline spotted by SnakeEyes",
+                        "footer_icon": "https://avatars.slack-edge.com/2019-05-07/627979128852_e1d616abbd7312343db8_512.png",
+                        "ts": int(time.time())
+                    }]
+            )
+        except ModuleNotFoundError:
+            pass
+
+onerror:
+    if config["slack_token"]:
+        try:
+            from slackclient import SlackClient
+
+            token = config["slack_token"]
+            sc = SlackClient(token)
+            sc.api_call(
+                    "chat.postMessage", channel=config["slack_channel"],
+                    attachments= [{
+                        "title": "Snakemake pipeline terminated unexpectedly",
+                        "text": "Boo :(",
+                        "footer": "Trashed pipeline spotted by SnakeEyes",
+                        "footer_icon": "https://avatars.slack-edge.com/2019-05-07/627979128852_e1d616abbd7312343db8_512.png",
+                        "ts": int(time.time())
+                    }]
+            )
+        except ModuleNotFoundError:
+            pass
 
 # Load manifest(s)
 samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)     # defines the assembly and polishing strategies
@@ -123,7 +164,7 @@ rule polish_pilon:
 
 rule summarise_assembly_stats:
     input:
-        enumerate_assemblies(suffix=".fa")
+        enumerate_assemblies(suffix=".fa", unroll=False)
     output:
         "assembly_stats.txt"
     shell:
@@ -145,13 +186,13 @@ rule bond_summarise_kraken:
     shell:
         "bond {input} ../manifest.cfg > {output}"
 
-rule summarise_kraken:
-    input:
-        enumerate_assemblies(suffix=".fa.k2")
-    output:
-        "kraken_summary.tsv"
-    shell:
-        "python ../scripts/extracken2.py {input} > {output}"
+#rule summarise_kraken:
+#    input:
+#        enumerate_assemblies(suffix=".fa.k2")
+#    output:
+#        "kraken_summary.tsv"
+#    shell:
+#        "python ../scripts/extracken2.py {input} > {output}"
 
 rule download_kraken_database:
     output:

@@ -6,4 +6,7 @@ database_root:
     "path/to/kraken/db"
 genome_size:
     "100m"
-
+slack_token:
+    ""
+slack_channel:
+    "#general"
