@@ -10,6 +10,12 @@ conda env create --name reticulatus --file environments/base.yaml
 conda activate reticulatus
 ```
 
+#### Select a workflow
+
+```
+cp Snakemake-[base|full] Snakemake
+```
+
 #### Engage the pipeline
 
 Run the pipeline with `snakemake`, you **must** specify `--use-conda` to ensure that
