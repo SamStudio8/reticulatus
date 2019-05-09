@@ -186,7 +186,7 @@ rule summarise_assembly_meta:
     output:
         "assembly_md5size.txt"
     shell:
-        "for fa in {input}; do base=`basename $fa`; md5=`md5sum $fa | cut -f1 -d' '`; size=`du -h $fa | cut -f1`; echo \"$base,$size,$md5\"; done > {output}"
+        "for fa in {input}; do base=`basename $fa`; md5=`md5sum $fa | cut -f1 -d' '`; size=`du -Lh $fa | cut -f1`; echo \"$base,$size,$md5\"; done > {output}"
 
 rule bond_summarise_kraken:
     input:
