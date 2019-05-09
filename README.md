@@ -27,3 +27,7 @@ your computer falls over.
 ```
 snakemake -j <available_threads> --reason --use-conda
 ```
+
+## Housekeeping
+
+Unless otherwise stated by a suitable header, the files within this repository are made available under the MIT license. If you use this pipeline, an acknowledgement in your work would be nice... Don't forget to [cite Snakemake](https://snakemake.readthedocs.io/en/stable/project_info/citations.html).
