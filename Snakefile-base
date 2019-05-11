@@ -174,7 +174,7 @@ rule polish_pilon:
 
 rule summarise_assembly_stats:
     input:
-        enumerate_assemblies(suffix=".fa", unroll=False)
+        enumerate_assemblies(suffix=".fa")
     output:
         "assembly_stats.txt"
     shell:

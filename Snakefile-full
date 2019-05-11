@@ -18,6 +18,7 @@ rule all:
     input:
         web_html="index.html",
         web_pngs="png.tar",
+        tsv="minidot_summary.bond.tsv",
         kraken="kraken_summary.bond.tsv",
         polished=enumerate_assemblies(unroll=False, suffix=".fa")
 
@@ -78,6 +79,14 @@ rule merge_checkm:
     shell:
         "cat {input.logs} > {output}"
 
+rule bond_summarise_minidot:
+    input:
+        "minidot_summary.tsv"
+    output:
+        "minidot_summary.bond.tsv"
+    shell:
+        "bond {input} ../manifest.cfg --dheader 'auuid,suffix,genome,sum_contig,max_contig,n_contig,checkm' > {output}"
+
 rule tabulate_minidot:
     input:
         stat="assembly_stats.txt",
@@ -87,7 +96,8 @@ rule tabulate_minidot:
         checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies())
     output:
         html="index.html",
-        pngs="png.tar"
+        pngs="png.tar",
+        tsv="minidot_summary.tsv",
     shell:
         "python ../scripts/summarise_assemblies.py {input.stat} {input.meta} {input.manifest} 1 > {output.html}; tar -cvf {output.pngs} minidotplots/*.png"
 

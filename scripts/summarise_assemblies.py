@@ -1,6 +1,8 @@
 import sys
 import parse_checkm
 
+import pysam
+
 species = [
     "bacillus_subtilis",
     "enterococcus_faecalis",
@@ -29,19 +31,8 @@ try_checkm = False
 if len(sys.argv) == 5:
     try_checkm = True
 
-#print("<html><head></head><body><table>")
-#print("""---
-#layout: assembly
-#title: Assemblies
-#---
+tab_fh = open("minidot_summary.tsv", 'w')
 
-### Illumina Mock Community Draft References v1.0
-
-#* [Zymo-Isolates-SPAdes-Illumina.fasta](http://nanopore.s3.climb.ac.uk/mockcommunity/v2/Zymo-Isolates-SPAdes-Illumina.fasta) (69 MB, `e7b60972c37869e0e91513a06bdf9d33`)
-
-### Nanopore Assemblies (wtdbg2) v1.1
-
-#""")
 print("<table>")
 fields = [
     "<tr>",
@@ -63,7 +54,7 @@ fields.extend([
 fields.append("<th>Download</th>")
 
 fields.append("</tr>")
-        
+
 print("\n".join(fields))
 
 stats_fh = open(sys.argv[1])
@@ -71,7 +62,7 @@ for line in stats_fh:
     fields = line.strip().split('\t')
     if fields[0] == "Sample_ID":
         continue
-    
+
     fa = fields[0]
 
     uuid = fa.split('.')[0]
@@ -80,7 +71,6 @@ for line in stats_fh:
     genome_size = int(fields[1])
     n_contigs = int(fields[2])
     n50 = int(fields[5])
-
 
     fields = [
         "<tr>",
@@ -113,8 +103,35 @@ for line in stats_fh:
             "<td style='text-align:center'>%s</td>" % (checkm_d.get(ref, {}).get("Completeness", "?")) for ref in species
         ])
         fields.append("</tr>")
-            
+
+    for ref in species:
+        try:
+            # To be honest we could have just done this from the FAI but whatever
+            extracted_fa = pysam.FastaFile("extracted_contigs/%s/%s.fasta" % (fa.replace(".fa", ""), ref))
+
+            len_list = extracted_fa.lengths
+            genome_total_size = sum(len_list)
+            genome_largest_contig = max(len_list)
+            genome_n_contigs = len(len_list)
+
+            extracted_fa.close()
+        except:
+            genome_total_size = 0
+            genome_largest_contig = 0
+            genome_n_contigs = 0
+
+        tab_fh.write("\t".join([ str(x) for x in [
+            uuid,
+            fa.replace(uuid, ""),
+            ref,
+            genome_total_size,
+            genome_largest_contig,
+            genome_n_contigs,
+            checkm_d.get(ref, {}).get("Completeness", "?"),
+        ]]) + '\n')
+
     print("\n".join(fields))
 
-#print("</table></body></html>")
 print("</table>")
+
+tab_fh.close()
