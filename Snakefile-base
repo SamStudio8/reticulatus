@@ -196,13 +196,13 @@ rule bond_summarise_kraken:
     shell:
         "bond {input} ../manifest.cfg > {output}"
 
-#rule summarise_kraken:
-#    input:
-#        enumerate_assemblies(suffix=".fa.k2")
-#    output:
-#        "kraken_summary.tsv"
-#    shell:
-#        "python ../scripts/extracken2.py {input} > {output}"
+rule summarise_kraken:
+    input:
+        enumerate_assemblies(suffix=".fa.k2")
+    output:
+        "kraken_summary.tsv"
+    shell:
+        "python ../scripts/extracken2.py {input} > {output}"
 
 rule download_kraken_database:
     output:
