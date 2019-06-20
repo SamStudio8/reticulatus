@@ -1,6 +1,7 @@
 import pandas as pd
 from snakemake.utils import validate
 import sys
+import time
 
 shell.executable('bash')
 
@@ -12,6 +13,56 @@ configfile: "config.yaml"
 # Note that most things need to be prefixed with ../ to refer to the current directory,
 # but there are exceptions like when reading cfg files and conda environments.
 workdir: "working/"
+
+onsuccess:
+    cwd = os.getcwd()
+    if config["slack_token"]:
+        try:
+            from slackclient import SlackClient
+
+            token = config["slack_token"]
+            sc = SlackClient(token)
+            sc.api_call(
+                    "chat.postMessage", channel=config["slack_channel"],
+                    attachments= [{
+                        "title": "Snakemake pipeline completed successfully",
+                        "color": "#36a64f",
+                        "text": "Hooray!",
+                        "footer": "Completed pipeline spotted by SnakeEyes",
+                        "footer_icon": "https://avatars.slack-edge.com/2019-05-07/627979128852_e1d616abbd7312343db8_512.png",
+                        "ts": int(time.time()),
+                        "fields": [
+                            { "title": "Working Directory", "value": cwd, "short": False },
+                        ],
+                    }]
+            )
+        except ModuleNotFoundError:
+            pass
+
+onerror:
+    cwd = os.getcwd()
+    if config["slack_token"]:
+        try:
+            from slackclient import SlackClient
+
+            token = config["slack_token"]
+            sc = SlackClient(token)
+            sc.api_call(
+                    "chat.postMessage", channel=config["slack_channel"],
+                    attachments= [{
+                        "title": "Snakemake pipeline terminated unexpectedly",
+                        "color": "#e20b00",
+                        "text": "Boo :(",
+                        "footer": "Trashed pipeline spotted by SnakeEyes",
+                        "footer_icon": "https://avatars.slack-edge.com/2019-05-07/627979128852_e1d616abbd7312343db8_512.png",
+                        "ts": int(time.time()),
+                        "fields": [
+                            { "title": "Working Directory", "value": cwd, "short": False },
+                        ],
+                    }]
+            )
+        except ModuleNotFoundError:
+            pass
 
 # Load manifest(s)
 samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)     # defines the assembly and polishing strategies
@@ -135,7 +186,7 @@ rule summarise_assembly_meta:
     output:
         "assembly_md5size.txt"
     shell:
-        "for fa in {input}; do base=`basename $fa`; md5=`md5sum $fa | cut -f1 -d' '`; size=`du -h $fa | cut -f1`; echo \"$base,$size,$md5\"; done > {output}"
+        "for fa in {input}; do base=`basename $fa`; md5=`md5sum $fa | cut -f1 -d' '`; size=`du -Lh $fa | cut -f1`; echo \"$base,$size,$md5\"; done > {output}"
 
 rule bond_summarise_kraken:
     input:
@@ -145,17 +196,17 @@ rule bond_summarise_kraken:
     shell:
         "bond {input} ../manifest.cfg > {output}"
 
-rule summarise_kraken:
-    input:
-        enumerate_assemblies(suffix=".fa.k2")
-    output:
-        "kraken_summary.tsv"
-    shell:
-        "python ../scripts/extracken2.py {input} > {output}"
+#rule summarise_kraken:
+#    input:
+#        enumerate_assemblies(suffix=".fa.k2")
+#    output:
+#        "kraken_summary.tsv"
+#    shell:
+#        "python ../scripts/extracken2.py {input} > {output}"
 
 rule download_kraken_database:
     output:
-        ok=touch("k2db.ok"),
+        ok=touch(os.path.join(config["database_root"], "k2db.ok")),
         h=os.path.join(config["database_root"], "hash.k2d"),
         o=os.path.join(config["database_root"], "opts.k2d"),
         t=os.path.join(config["database_root"], "taxo.k2d"),
@@ -163,7 +214,7 @@ rule download_kraken_database:
 
 rule kraken:
     input:
-        fa="{uuid}.{prefix}.fa", ok="k2db.ok"
+        fa="{uuid}.{prefix}.fa", ok=os.path.join(config["database_root"], "k2db.ok")
     output:
         "{uuid}.{prefix}.fa.k2"
     threads: 8
@@ -271,13 +322,14 @@ rule flye_assembly:
         reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
         ready="flye.ok"
     params:
+        overlap=lambda w: '-m %s' % samples.loc[w.uuid]['flyem'] if samples.loc[w.uuid]['flyem'] != '-' else '',
         genome_size=config["genome_size"],
         d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
     output:
         fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
-    threads: 48
+    threads: 24
     shell:
-        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads}"
+        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap}"
 
 rule link_flye_assembly:
     input: "{uuid}.{assembler}/assembly.fasta"
