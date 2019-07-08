@@ -2,7 +2,9 @@ long_fq_root:
     "path/to/long/reads"
 short_fq_root:
     "path/to/short/reads"
-database_root:
+dehumanizer_database_root:
+    "path/to/dh/refs"
+kraken2_database_root:
     "path/to/kraken/db"
 genome_size:
     "100m"

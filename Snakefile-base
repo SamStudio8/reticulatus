@@ -80,7 +80,7 @@ def unroll_assemblies(w, name, unroll=True):
     end_polish = polishes[-1]
     end_polish_f = end_polish.split("-")
     end_iter = int(end_polish_f[-1])
-    if (end_iter - 1) == 0:
+    if (end_iter - 1) < 1:
         return [name] + unroll_assemblies(w, ".".join(polishes[:-1]))
     else:
         end_polish_f[-1] = str(end_iter-1)
@@ -124,6 +124,8 @@ def input_polish_medaka(w):
     return input_polish(w, "medaka")
 def input_polish_pilon(w):
     return input_polish(w, "pilon")
+def input_polish_dehumanizer(w):
+    return input_polish(w, "dehumanizer")
 
 def minimap2_mode(w):
     if w.readtype == "ont":
@@ -158,6 +160,27 @@ rule polish_medaka:
     threads: 12
     shell:
         "rm -rf medaka-{wildcards.uuid}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{wildcards.uuid} -t {threads} -m {params.model}; mv medaka-{wildcards.uuid}/consensus.fasta {output}"
+
+rule download_dehumanizer_database:
+    output:
+        ok=touch(os.path.join(config["dehumanizer_database_root"], "dehuman.ok")),
+        a=os.path.join(config["dehumanizer_database_root"], "GCA_000786075.2_hs38d1_genomic.fna.mmi"),
+        b=os.path.join(config["dehumanizer_database_root"], "GCA_000001405.27_GRCh38.p12_genomic.fna.mmi"),
+        c=os.path.join(config["dehumanizer_database_root"], "hla_gen.fasta.mmi"),
+        manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
+    shell:
+        "bash ../scripts/download_dehumanizer_refs.sh %s" % config["dehumanizer_database_root"]
+
+rule polish_dehumanizer:
+    input:
+        contigs=input_polish_dehumanizer,
+        ok=os.path.join(config["dehumanizer_database_root"], "dehuman.ok"),
+        manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
+    output:
+        "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}dehumanizer-{readtype,\w+}-{iteration,\d+}.fa"
+    threads: 3
+    shell:
+        "dehumanize {input.manifest} {input.contigs} {output}"
 
 rule download_pilon:
     output: "pilon-1.23.jar"
@@ -207,20 +230,20 @@ rule summarise_kraken:
 
 rule download_kraken_database:
     output:
-        ok=touch(os.path.join(config["database_root"], "k2db.ok")),
-        h=os.path.join(config["database_root"], "hash.k2d"),
-        o=os.path.join(config["database_root"], "opts.k2d"),
-        t=os.path.join(config["database_root"], "taxo.k2d"),
-    shell: "cd %s; wget https://raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/databases/go.sh; bash go.sh" % config["database_root"]
+        ok=touch(os.path.join(config["kraken2_database_root"], "k2db.ok")),
+        h=os.path.join(config["kraken2_database_root"], "hash.k2d"),
+        o=os.path.join(config["kraken2_database_root"], "opts.k2d"),
+        t=os.path.join(config["kraken2_database_root"], "taxo.k2d"),
+    shell: "bash ../scripts/download_kraken2_db.sh %s" % config["kraken2_database_root"]
 
 rule kraken:
     input:
-        fa="{uuid}.{prefix}.fa", ok=os.path.join(config["database_root"], "k2db.ok")
+        fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
     output:
         "{uuid}.{prefix}.fa.k2"
     threads: 8
     shell:
-        "kraken2 --db %s --use-names -t {threads} --output {output} {input.fa}" % config["database_root"]
+        "kraken2 --db %s --use-names -t {threads} --output {output} {input.fa}" % config["kraken2_database_root"]
 
 def pick_assembler_version(assembler):
     lookup = {
