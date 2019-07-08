@@ -86,13 +86,13 @@ def unroll_assemblies(w, name, unroll=True):
         end_polish_f[-1] = str(end_iter-1)
         return [name] + unroll_assemblies(w, ".".join(polishes[:-1] + ["-".join(end_polish_f)]))
 
-def enumerate_assemblies(w=None, suffix="", unroll=True):
+def enumerate_assemblies(w=None, suffix="", unroll=True, base_only=False):
     base_assemblies = []
     polished_assemblies = []
     for uuid in samples["uuid"]:
         for assembler in samples.loc[uuid]["assemblers"].split(","):
             base_assemblies.append( "%s.%s.ctg.cns%s" % (uuid, assembler, suffix) )
-            if samples.loc[uuid]["poa"] != '-':
+            if samples.loc[uuid]["poa"] != '-' and not base_only:
                 unrolled = unroll_assemblies(w, samples.loc[uuid]["poa"], unroll=unroll)
                 context = ['%s.%s.ctg.cns.%s%s' % (uuid, assembler, step, suffix) for step in unrolled]
                 polished_assemblies.extend(context)
@@ -106,7 +106,8 @@ rule finish:
         stat="assembly_stats.txt",
         meta="assembly_md5size.txt",
         kraken="kraken_summary.bond.tsv",
-        polished=enumerate_assemblies(unroll=False, suffix=".fa")
+        polished=enumerate_assemblies(unroll=False, suffix=".fa"),
+        base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg")
 
 def input_polish(w, name):
     if int(w.iteration) > 1:
@@ -335,3 +336,24 @@ rule link_flye_assembly:
     input: "{uuid}.{assembler}/assembly.fasta"
     output: "{uuid}.{assembler,flye[A-z0-9._-]*}.ctg.cns.fa"
     shell: "ln -s {input} {output}"
+
+rule install_bandage_linux:
+    output: ok=touch("bandage.ok"), b="ware/bandage/Bandage",
+    shell: "cd ware; wget https://github.com/rrwick/Bandage/releases/download/v0.8.1/Bandage_Ubuntu_static_v0_8_1.zip; unzip Bandage_Ubuntu_static_v0_8_1.zip -d bandage;"
+
+rule prep_wtdbg2_gfa:
+    input: "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.dot.gz"
+    output: "{uuid}.{assembler,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
+    shell: "zcat {input} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
+
+rule prep_flye_gfa:
+    input: "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly_graph.gfa"
+    output: "{uuid}.{assembler,flye[A-z0-9._-]*}.ctg.cns.gfa"
+    shell: "ln -s {input} {output}"
+
+rule bandage_assembly:
+    input:
+        b="bandage.ok",
+        assembly="{uuid}.{prefix}.gfa"
+    output: "{uuid}.{prefix}.gfa.svg"
+    shell: "ware/bandage/Bandage image {input.assembly} {output}"
