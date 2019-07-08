@@ -1,4 +1,5 @@
 manifest.cfg
+reads.cfg
 config.yaml
 working/
 .snakemake
