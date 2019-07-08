@@ -346,10 +346,12 @@ rule prep_wtdbg2_gfa:
     output: "{uuid}.{assembler,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
     shell: "zcat {input} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
 
+#NOTE We reduce only the flye GFA because it has too many links to draw, and also the
+# wtdbg2 graph isnt actually representative of the consensus so the contigs dont match up at all
 rule prep_flye_gfa:
     input: "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly_graph.gfa"
     output: "{uuid}.{assembler,flye[A-z0-9._-]*}.ctg.cns.gfa"
-    shell: "ln -s {input} {output}"
+    shell: "python ../scripts/reduce_gfa.py {input} 50000 > {output}"
 
 rule bandage_assembly:
     input:
