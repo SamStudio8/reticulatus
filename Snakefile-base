@@ -240,10 +240,11 @@ rule kraken:
     input:
         fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
     output:
-        "{uuid}.{prefix}.fa.k2"
+        out="{uuid}.{prefix}.fa.k2",
+        rep="{uuid}.{prefix}.fa.k2r",
     threads: 8
     shell:
-        "kraken2 --db %s --use-names -t {threads} --output {output} {input.fa}" % config["kraken2_database_root"]
+        "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
 
 def pick_assembler_version(assembler):
     lookup = {
