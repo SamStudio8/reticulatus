@@ -283,6 +283,16 @@ rule subset_reads:
     shell:
         "seqtk sample {input} {params.ratio} | gzip -1 > {output}"
 
+rule rmdup_reads:
+    input:
+        os.path.join(config["long_fq_root"], "{fq}.fq.gz")
+    output:
+        out=os.path.join(config["long_fq_root"], "{fq}.rmdup.fq.gz"),
+        dup=os.path.join(config["long_fq_root"], "{fq}.dup.fq.gz"),
+    shell:
+        "zcat {input} | seqkit rmdup -s -i -m -o {output.out} -d {output.dup}"
+
+
 rule install_wtdbg2:
     output:
         ok=touch("w2.ok"),

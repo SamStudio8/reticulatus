@@ -15,6 +15,7 @@ dependencies:
   - racon
   - seqtk
   - kraken2
+  - seqkit
   - pip:
     - medaka
     - git+https://github.com/SamStudio8/bondage.git
