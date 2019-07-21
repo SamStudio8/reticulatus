@@ -15,6 +15,7 @@ configfile: "config.yaml"
 workdir: "working/"
 
 onsuccess:
+    # TODO Need to update https://github.com/slackapi/python-slackclient/wiki/Migrating-to-2.x
     cwd = os.getcwd()
     if config["slack_token"]:
         try:
