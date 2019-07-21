@@ -12,3 +12,5 @@ slack_token:
     ""
 slack_channel:
     "#general"
+cuda:
+    False

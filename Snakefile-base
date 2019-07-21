@@ -145,11 +145,12 @@ rule polish_racon:
     input: contigs=input_polish_racon, reads=polish_reads_input
     params:
         mode=minimap2_mode,
+        cuda="--cudapoa-batches 8 --cuda-banded-alignment" if config["cuda"] else "",
     output:
         "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
-        "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {output}.paf {input.contigs} > {output}"
+        "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {output}.paf {input.contigs} {params.cuda} > {output}"
 
 rule polish_medaka:
     input: contigs=input_polish_medaka, reads=polish_reads_input
@@ -307,7 +308,8 @@ rule wtdbg2_assembly:
         max_k=lambda w: samples.loc[w.uuid]['max_k'],
         max_node=lambda w: samples.loc[w.uuid]['max_node'],
     output:
-        "{uuid}.{assembler,wtdbg2}.ctg.lay.gz"
+        lay="{uuid}.{assembler,wtdbg2}.ctg.lay.gz",
+        dot="{uuid}.{assembler,wtdbg2}.ctg.dot.gz",
     threads: 24
     shell:
         "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
@@ -328,7 +330,8 @@ rule wtdbg2_24_assembly:
         max_node=lambda w: samples.loc[w.uuid]['max_node'],
         genome_size=config["genome_size"],
     output:
-        "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
+        lay="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz",
+        dot="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
     threads: 24
     shell:
         "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -t {threads} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size}"
@@ -352,6 +355,7 @@ rule flye_assembly:
         d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
     output:
         fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
+        gfa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly_graph.gfa"
     threads: 24
     shell:
         "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap}"
@@ -366,9 +370,11 @@ rule install_bandage_linux:
     shell: "cd ware; wget https://github.com/rrwick/Bandage/releases/download/v0.8.1/Bandage_Ubuntu_static_v0_8_1.zip; unzip Bandage_Ubuntu_static_v0_8_1.zip -d bandage;"
 
 rule prep_wtdbg2_gfa:
-    input: "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.dot.gz"
+    input:
+        dot="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
+        assembly="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     output: "{uuid}.{assembler,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
-    shell: "zcat {input} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
+    shell: "zcat {input.dot} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
 
 #NOTE We reduce only the flye GFA because it has too many links to draw, and also the
 # wtdbg2 graph isnt actually representative of the consensus so the contigs dont match up at all
@@ -380,6 +386,7 @@ rule prep_flye_gfa:
 rule bandage_assembly:
     input:
         b="bandage.ok",
-        assembly="{uuid}.{prefix}.gfa"
+        gfa="{uuid}.{prefix}.gfa",
+        assembly="{uuid}.{prefix}.fa"
     output: "{uuid}.{prefix}.gfa.svg"
-    shell: "ware/bandage/Bandage image {input.assembly} {output}"
+    shell: "ware/bandage/Bandage image {input.gfa} {output}"
