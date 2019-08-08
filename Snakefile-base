@@ -2,6 +2,7 @@ import pandas as pd
 from snakemake.utils import validate
 import sys
 import time
+import pipe
 
 shell.executable('bash')
 
@@ -66,8 +67,8 @@ onerror:
             pass
 
 # Load manifest(s)
-samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)     # defines the assembly and polishing strategies
-illumina_lookup = pd.read_table("../reads.cfg").set_index("ont", drop=False) # provides a lookup of short reads for polishing
+samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)  # defines the assembly and polishing strategies
+reads_lookup = pd.read_table("../reads.cfg").set_index("samplename", drop=False)
 
 # Utility functions
 def unroll_assemblies(w, name, unroll=True):
@@ -91,12 +92,16 @@ def enumerate_assemblies(w=None, suffix="", unroll=True, base_only=False):
     base_assemblies = []
     polished_assemblies = []
     for uuid in samples["uuid"]:
-        for assembler in samples.loc[uuid]["assemblers"].split(","):
-            base_assemblies.append( "%s.%s.ctg.cns%s" % (uuid, assembler, suffix) )
-            if samples.loc[uuid]["poa"] != '-' and not base_only:
-                unrolled = unroll_assemblies(w, samples.loc[uuid]["poa"], unroll=unroll)
-                context = ['%s.%s.ctg.cns.%s%s' % (uuid, assembler, step, suffix) for step in unrolled]
-                polished_assemblies.extend(context)
+        conf = samples.loc[uuid]["assemblerconf"]
+        #base_uuid = uuid
+        #if samples.loc[uuid]["useassembly"]:
+        #    base_uuid = samples.loc[uuid]["useassembly"]
+        base_assemblies.append( "%s.%s.ctg.cns%s" % (uuid, conf, suffix) )
+
+        if samples.loc[uuid]["polishpipe"] != '-' and not base_only:
+            unrolled = unroll_assemblies(w, samples.loc[uuid]["polishpipe"], unroll=unroll)
+            context = ['%s.%s.ctg.cns.%s%s' % (uuid, conf, step, suffix) for step in unrolled]
+            polished_assemblies.extend(context)
     return base_assemblies + polished_assemblies
 
 for a in enumerate_assemblies(suffix=".fa"):
@@ -104,19 +109,40 @@ for a in enumerate_assemblies(suffix=".fa"):
 
 rule finish:
     input:
-        stat="assembly_stats.txt",
-        meta="assembly_md5size.txt",
-        kraken="kraken_summary.bond.tsv",
-        polished=enumerate_assemblies(unroll=False, suffix=".fa"),
-        base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg")
+        #stat="assembly_stats.txt",
+        #meta="assembly_md5size.txt",
+        #kraken="kraken_summary.bond.tsv",
+        #polished=enumerate_assemblies(unroll=False, suffix=".fa"),
+        #base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg")
+        polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
+
+# new and improved version of this rule doesn't fucking nuke your input reads
+rule subset_reads:
+    input:
+        "{fq}.fq.gz"
+    output:
+        "{fq}.subset.{ratio}.fq.gz"
+    params:
+        ratio=lambda w: float(w.ratio)/100
+    shell:
+        "seqtk sample {input} {params.ratio} | gzip -1 > {output}"
+
+rule rmdup_reads:
+    input:
+        "{fq}.fq.gz"
+    output:
+        out="{fq}.rmdup.fq.gz",
+        dup="{fq}.dup.fq.gz",
+    shell:
+        "zcat {input} | seqkit rmdup -s -i -m -o {output.out} -d {output.dup}"
 
 def input_polish(w, name):
     if int(w.iteration) > 1:
-        contigs = "%s.%s.ctg.cns.%s%s-%s-%d.fa" % (w.uuid, w.assembler, w.polishedprefix, name, w.readtype, int(w.iteration)-1)
+        contigs = "%s.%s.ctg.cns.%s%s-%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, name, w.readtype, int(w.iteration)-1)
     elif w.polishedprefix=="":
-        contigs = "%s.%s.ctg.cns.fa" % (w.uuid, w.assembler)
+        contigs = "%s.%s.ctg.cns.fa" % (w.uuid, w.conf)
     else:
-        contigs = "%s.%s.ctg.cns.%sfa" % (w.uuid, w.assembler, w.polishedprefix)
+        contigs = "%s.%s.ctg.cns.%sfa" % (w.uuid, w.conf, w.polishedprefix)
     return contigs
 
 def input_polish_racon(w):
@@ -135,11 +161,12 @@ def minimap2_mode(w):
         mode = "sr"
     return mode
 
+
 def polish_reads_input(w):
     if w.readtype == "ont":
-        reads = os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads'])
+        reads = reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]['ont']
     elif w.readtype == "ill":
-        reads = expand(os.path.join(config["short_fq_root"], "{fq}"), fq=[illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i1"], illumina_lookup.loc[ samples.loc[w.uuid]['reads'] ]["i2"]])
+        reads = [reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["i1"], reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["i2"]]
     return reads
 
 rule polish_racon:
@@ -148,7 +175,7 @@ rule polish_racon:
         mode=minimap2_mode,
         cuda="--cudapoa-batches 8 --cuda-banded-alignment" if config["cuda"] else "",
     output:
-        "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
+        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
         "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {output}.paf {input.contigs} {params.cuda} > {output}"
@@ -158,7 +185,7 @@ rule polish_medaka:
     params:
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
     output:
-        "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
+        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
         "rm -rf medaka-{wildcards.uuid}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{wildcards.uuid} -t {threads} -m {params.model}; mv medaka-{wildcards.uuid}/consensus.fasta {output}"
@@ -179,7 +206,7 @@ rule polish_dehumanizer:
         ok=os.path.join(config["dehumanizer_database_root"], "dehuman.ok"),
         manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
     output:
-        "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}dehumanizer-{readtype,\w+}-{iteration,\d+}.fa"
+        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}dehumanizer-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 3
     shell:
         "dehumanize {input.manifest} {input.contigs} {output}"
@@ -193,7 +220,7 @@ rule polish_pilon:
     params:
         mode=minimap2_mode,
     output:
-        polish="{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
+        polish="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
         "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
@@ -248,132 +275,35 @@ rule kraken:
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
 
-def pick_assembler_version(assembler):
-    lookup = {
-        "wtdbg2": "bin/wtdbg2",
-        "wtdbg2_2-4": "bin/wtdbg2_2-4",
-    }
-    return lookup[assembler]
-
-def pick_wtdbg2_cns_version(assembler):
-    lookup = {
-        "wtdbg2": "bin/wtpoa-cns",
-        "wtdbg2_2-4": "bin/wtpoa-cns_2-4",
-    }
-    return lookup[assembler]
-
-rule wtdbg2_consensus:
-    input:
-        "{uuid}.{assembler}.ctg.lay.gz"
-    output:
-        "{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
-    params:
-        cnsbin=lambda w: pick_wtdbg2_cns_version(w.assembler)
-    threads: 12
-    shell:
-        "{params.cnsbin} -f -i {input} -o {output} -t {threads}"
-
-# new and improved version of this rule doesn't fucking nuke your input reads
-rule subset_reads:
-    input:
-        os.path.join(config["long_fq_root"], "{fq}.fq.gz")
-    output:
-        os.path.join(config["long_fq_root"], "{fq}.subset.{ratio}.fq.gz")
-    params:
-        ratio=lambda w: float(w.ratio)/100
-    shell:
-        "seqtk sample {input} {params.ratio} | gzip -1 > {output}"
-
-rule rmdup_reads:
-    input:
-        os.path.join(config["long_fq_root"], "{fq}.fq.gz")
-    output:
-        out=os.path.join(config["long_fq_root"], "{fq}.rmdup.fq.gz"),
-        dup=os.path.join(config["long_fq_root"], "{fq}.dup.fq.gz"),
-    shell:
-        "zcat {input} | seqkit rmdup -s -i -m -o {output.out} -d {output.dup}"
-
-
-rule install_wtdbg2:
-    output:
-        ok=touch("w2.ok"),
-        d=directory("git/wtdbg2"),
-        w2_bin_904f2b3="bin/wtdbg2",
-        cns_bin_904f2b3="bin/wtpoa-cns",
-        w2_bin_6a0691e="bin/wtdbg2_2-4",
-        cns_bin_6a0691e="bin/wtpoa-cns_2-4"
-    shell: "cd git; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard 904f2b3ebdaa1e6f268cc58937767891a00d5bcb; make; cp wtdbg2 ../../bin; cp wtpoa-cns ../../bin; git reset --hard 6a0691e308b3644b6f718a03679f697d058e2be6; make; cp wtdbg2 ../../bin/wtdbg2_2-4; cp wtpoa-cns ../../bin/wtpoa-cns_2-4;"
-
-rule wtdbg2_assembly:
-    input:
-        reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
-        ready="w2.ok"
-    params:
-        abin=lambda w: pick_assembler_version(w.assembler),
-        prefix=lambda w: w.uuid+'.'+w.assembler,
-        pmer=lambda w: samples.loc[w.uuid]['pmer'],
-        kmer=lambda w: samples.loc[w.uuid]['kmer'],
-        sampler=lambda w: samples.loc[w.uuid]['sampler'],
-        edge=lambda w: samples.loc[w.uuid]['edge'],
-        length=lambda w: samples.loc[w.uuid]['length'],
-        max_k=lambda w: samples.loc[w.uuid]['max_k'],
-        max_node=lambda w: samples.loc[w.uuid]['max_node'],
-    output:
-        lay="{uuid}.{assembler,wtdbg2}.ctg.lay.gz",
-        dot="{uuid}.{assembler,wtdbg2}.ctg.dot.gz",
-    threads: 24
-    shell:
-        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
-
-rule wtdbg2_24_assembly:
-    input:
-        reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
-        ready="w2.ok"
-    params:
-        abin=lambda w: pick_assembler_version(w.assembler),
-        prefix=lambda w: w.uuid+'.'+w.assembler,
-        pmer=lambda w: samples.loc[w.uuid]['pmer'],
-        kmer=lambda w: samples.loc[w.uuid]['kmer'],
-        sampler=lambda w: samples.loc[w.uuid]['sampler'],
-        edge=lambda w: samples.loc[w.uuid]['edge'],
-        length=lambda w: samples.loc[w.uuid]['length'],
-        max_k=lambda w: samples.loc[w.uuid]['max_k'],
-        max_node=lambda w: samples.loc[w.uuid]['max_node'],
-        genome_size=config["genome_size"],
-    output:
-        lay="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz",
-        dot="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
-    threads: 24
-    shell:
-        "{params.abin} -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -t {threads} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size}"
-
-rule install_flye:
-    output:
-        ok=touch("flye.ok"),
-        d=directory("git/Flye"),
-        flye_bin="bin/flye",
-    shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard eb89c9ef000f6dbcea426dcb430db92290546196; make; cp bin/flye ../../bin;"
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
+rule install_flye_hash:
+    output:
+        ok=touch("{conf,flye[A-z0-9_-]*}.ok"),
+        #flye_bin="git/{conf,flye[A-z0-9_-]*}/Flye/bin/flye",
+    params:
+        hash=lambda w: pipe.mypipes[w.conf]["hash"],
+    shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard {params.hash}; make"
+
 rule flye_assembly:
     conda: "environments/flye.yaml"
     input:
-        reads=lambda w: os.path.join(config["long_fq_root"], samples.loc[w.uuid]['reads']),
-        ready="flye.ok"
+        reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
+        ready=lambda w: "%s.ok" % samples.loc[w.uuid]["assemblerconf"],
     params:
-        overlap=lambda w: '-m %s' % samples.loc[w.uuid]['flyem'] if samples.loc[w.uuid]['flyem'] != '-' else '',
-        genome_size=config["genome_size"],
-        d = "{uuid}.{assembler,flye[A-z0-9_-]*}/"
+        overlap=lambda w: '-m %s' % pipe.mypipes[w.conf]['m'] if pipe.mypipes[w.conf]['m'] != '-' else '',
+        genome_size=lambda w: pipe.mypipes[w.conf]['genome_size'],
+        d = "{uuid}.{conf,flye[A-z0-9_-]*}/",
     output:
-        fa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly.fasta",
-        gfa = "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly_graph.gfa"
+        fa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly.fasta",
+        gfa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
     threads: 24
     shell:
-        "git/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap}"
+        "git/{wildcards.conf}/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap}"
 
 rule link_flye_assembly:
-    input: "{uuid}.{assembler}/assembly.fasta"
-    output: "{uuid}.{assembler,flye[A-z0-9._-]*}.ctg.cns.fa"
+    input: "{uuid}.{conf}/assembly.fasta"
+    output: "{uuid}.{conf,flye[A-z0-9._-]*}.ctg.cns.fa"
     shell: "ln -s {input} {output}"
 
 rule install_bandage_linux:
@@ -382,16 +312,16 @@ rule install_bandage_linux:
 
 rule prep_wtdbg2_gfa:
     input:
-        dot="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
-        assembly="{uuid}.{assembler,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
-    output: "{uuid}.{assembler,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
+        dot="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
+        assembly="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
+    output: "{uuid}.{conf,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
     shell: "zcat {input.dot} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
 
 #NOTE We reduce only the flye GFA because it has too many links to draw, and also the
 # wtdbg2 graph isnt actually representative of the consensus so the contigs dont match up at all
 rule prep_flye_gfa:
-    input: "{uuid}.{assembler,flye[A-z0-9_-]*}/assembly_graph.gfa"
-    output: "{uuid}.{assembler,flye[A-z0-9._-]*}.ctg.cns.gfa"
+    input: "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
+    output: "{uuid}.{conf,flye[A-z0-9._-]*}.ctg.cns.gfa"
     shell: "python ../scripts/reduce_gfa.py {input} 50000 > {output}"
 
 rule bandage_assembly:
@@ -401,3 +331,62 @@ rule bandage_assembly:
         assembly="{uuid}.{prefix}.fa"
     output: "{uuid}.{prefix}.gfa.svg"
     shell: "ware/bandage/Bandage image {input.gfa} {output}"
+
+rule wtdbg2_consensus:
+    input:
+        "{uuid}.{conf}.ctg.lay.gz"
+    output:
+        "{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
+    threads: 12
+    shell:
+        "git/{wildcards.conf}/wtdbg2/wtpoa-cns -f -i {input} -o {output} -t {threads}"
+
+rule install_wtdbg2_hash:
+    output:
+        ok=touch("{conf,wtdbg2[A-z0-9_-]*}.ok"),
+        #w2_bin="git/{conf,wtdbg2[A-z0-9_-]*}/wtdbg2/wtdbg2",
+        #w2_poa="git/{conf,wtdbg2[A-z0-9_-]*}/wtdbg2/wtpoa-cns",
+    params:
+        hash=lambda w: pipe.mypipes[w.conf]["hash"],
+    shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard {params.hash}; make;"
+
+rule wtdbg2_assembly:
+    input:
+        reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
+        ready="w2.ok"
+    params:
+        pmer=lambda w: pipe.mypipes[w.conf]['pmer'],
+        kmer=lambda w: pipe.mypipes[w.conf]['kmer'],
+        sampler=lambda w: pipe.mypipes[w.conf]['sampler'],
+        edge=lambda w: pipe.mypipes[w.conf]['edge'],
+        length=lambda w: pipe.mypipes[w.conf]['length'],
+        max_k=lambda w: pipe.mypipes[w.conf]['max_k'],
+        max_node=lambda w: pipe.mypipes[w.conf]['max_node'],
+        prefix=lambda w: w.uuid+'.'+w.conf,
+    output:
+        lay="{uuid}.{conf,wtdbg2}.ctg.lay.gz",
+        dot="{uuid}.{conf,wtdbg2}.ctg.dot.gz",
+    threads: 24
+    shell:
+        "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
+
+rule wtdbg2_24_assembly:
+    input:
+        reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
+        ready=lambda w: "%s.ok" % samples.loc[w.uuid]["assemblerconf"],
+    params:
+        prefix=lambda w: w.uuid+'.'+w.conf,
+        pmer=lambda w: pipe.mypipes[w.conf]['pmer'],
+        kmer=lambda w: pipe.mypipes[w.conf]['kmer'],
+        sampler=lambda w: pipe.mypipes[w.conf]['sampler'],
+        edge=lambda w: pipe.mypipes[w.conf]['edge'],
+        length=lambda w: pipe.mypipes[w.conf]['length'],
+        max_k=lambda w: pipe.mypipes[w.conf]['max_k'],
+        max_node=lambda w: pipe.mypipes[w.conf]['max_node'],
+        genome_size=lambda w: pipe.mypipes[w.conf]['genome_size'],
+    output:
+        lay="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz",
+        dot="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
+    threads: 24
+    shell:
+        "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size} -t {threads}"
