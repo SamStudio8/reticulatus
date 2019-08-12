@@ -36,7 +36,7 @@ redbean24.update({
 
 
 # lame way of doing this
-mypipes = {
+spells = {
     "flye25" : flye25,
     "wtdbg2-24" : redbean24
 }

@@ -2,7 +2,7 @@ import pandas as pd
 from snakemake.utils import validate
 import sys
 import time
-import pipe
+from spellbook import spells
 
 shell.executable('bash')
 
@@ -92,7 +92,7 @@ def enumerate_assemblies(w=None, suffix="", unroll=True, base_only=False):
     base_assemblies = []
     polished_assemblies = []
     for uuid in samples["uuid"]:
-        conf = samples.loc[uuid]["assemblerconf"]
+        conf = samples.loc[uuid]["spell"]
         #base_uuid = uuid
         #if samples.loc[uuid]["useassembly"]:
         #    base_uuid = samples.loc[uuid]["useassembly"]
@@ -282,17 +282,17 @@ rule install_flye_hash:
         ok=touch("{conf,flye[A-z0-9_-]*}.ok"),
         #flye_bin="git/{conf,flye[A-z0-9_-]*}/Flye/bin/flye",
     params:
-        hash=lambda w: pipe.mypipes[w.conf]["hash"],
+        hash=lambda w: spell.spells[w.conf]["hash"],
     shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard {params.hash}; make"
 
 rule flye_assembly:
     conda: "environments/flye.yaml"
     input:
         reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
-        ready=lambda w: "%s.ok" % samples.loc[w.uuid]["assemblerconf"],
+        ready=lambda w: "%s.ok" % samples.loc[w.uuid]["spell"],
     params:
-        overlap=lambda w: '-m %s' % pipe.mypipes[w.conf]['m'] if pipe.mypipes[w.conf]['m'] != '-' else '',
-        genome_size=lambda w: pipe.mypipes[w.conf]['genome_size'],
+        overlap=lambda w: '-m %s' % spell.spells[w.conf]['m'] if spell.spells[w.conf]['m'] != '-' else '',
+        genome_size=lambda w: spell.spells[w.conf]['genome_size'],
         d = "{uuid}.{conf,flye[A-z0-9_-]*}/",
     output:
         fa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly.fasta",
@@ -347,7 +347,7 @@ rule install_wtdbg2_hash:
         #w2_bin="git/{conf,wtdbg2[A-z0-9_-]*}/wtdbg2/wtdbg2",
         #w2_poa="git/{conf,wtdbg2[A-z0-9_-]*}/wtdbg2/wtpoa-cns",
     params:
-        hash=lambda w: pipe.mypipes[w.conf]["hash"],
+        hash=lambda w: spells[w.conf]["hash"],
     shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard {params.hash}; make;"
 
 rule wtdbg2_assembly:
@@ -355,13 +355,13 @@ rule wtdbg2_assembly:
         reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
         ready="w2.ok"
     params:
-        pmer=lambda w: pipe.mypipes[w.conf]['pmer'],
-        kmer=lambda w: pipe.mypipes[w.conf]['kmer'],
-        sampler=lambda w: pipe.mypipes[w.conf]['sampler'],
-        edge=lambda w: pipe.mypipes[w.conf]['edge'],
-        length=lambda w: pipe.mypipes[w.conf]['length'],
-        max_k=lambda w: pipe.mypipes[w.conf]['max_k'],
-        max_node=lambda w: pipe.mypipes[w.conf]['max_node'],
+        pmer=lambda w: spells[w.conf]['pmer'],
+        kmer=lambda w: spells[w.conf]['kmer'],
+        sampler=lambda w: spells[w.conf]['sampler'],
+        edge=lambda w: spells[w.conf]['edge'],
+        length=lambda w: spells[w.conf]['length'],
+        max_k=lambda w: spells[w.conf]['max_k'],
+        max_node=lambda w: spells[w.conf]['max_node'],
         prefix=lambda w: w.uuid+'.'+w.conf,
     output:
         lay="{uuid}.{conf,wtdbg2}.ctg.lay.gz",
@@ -373,17 +373,17 @@ rule wtdbg2_assembly:
 rule wtdbg2_24_assembly:
     input:
         reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
-        ready=lambda w: "%s.ok" % samples.loc[w.uuid]["assemblerconf"],
+        ready=lambda w: "%s.ok" % samples.loc[w.uuid]["spell"],
     params:
         prefix=lambda w: w.uuid+'.'+w.conf,
-        pmer=lambda w: pipe.mypipes[w.conf]['pmer'],
-        kmer=lambda w: pipe.mypipes[w.conf]['kmer'],
-        sampler=lambda w: pipe.mypipes[w.conf]['sampler'],
-        edge=lambda w: pipe.mypipes[w.conf]['edge'],
-        length=lambda w: pipe.mypipes[w.conf]['length'],
-        max_k=lambda w: pipe.mypipes[w.conf]['max_k'],
-        max_node=lambda w: pipe.mypipes[w.conf]['max_node'],
-        genome_size=lambda w: pipe.mypipes[w.conf]['genome_size'],
+        pmer=lambda w: spells[w.conf]['pmer'],
+        kmer=lambda w: spells[w.conf]['kmer'],
+        sampler=lambda w: spells[w.conf]['sampler'],
+        edge=lambda w: spells[w.conf]['edge'],
+        length=lambda w: spells[w.conf]['length'],
+        max_k=lambda w: spells[w.conf]['max_k'],
+        max_node=lambda w: spells[w.conf]['max_node'],
+        genome_size=lambda w: spells[w.conf]['genome_size'],
     output:
         lay="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz",
         dot="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
