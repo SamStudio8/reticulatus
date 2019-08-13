@@ -24,7 +24,7 @@ for line in gfa:
                     curr_len = int(meta.split(":")[2])
         else:
             curr_len = len(fields[2])
-            name = fields[1].replace("edge", "contig")
+            name = fields[1]
 
         if curr_len >= LIMIT and name not in contigs_not_interest:
             contigs_in_size.append(name)
