@@ -15,6 +15,8 @@ dependencies:
   - racon
   - seqtk
   - kraken2
+  - seqkit
   - pip:
     - git+https://github.com/SamStudio8/bondage.git
     - git+https://github.com/SamStudio8/dehumanizer.git
+    - slackclient==1.3.1
