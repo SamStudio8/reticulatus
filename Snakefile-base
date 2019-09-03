@@ -153,14 +153,17 @@ rule polish_racon:
         "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {output}.paf {input.contigs} {params.cuda} > {output}"
 
 rule polish_medaka:
+    singularity: config["medaka_env"],
     input: contigs=input_polish_medaka, reads=polish_reads_input
     params:
+        prefix=lambda w: w.uuid+'.'+w.assembler,
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
+        batch="-b 100" if config["cuda"] else "",
     output:
         "{uuid}.{assembler}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
-        "rm -rf medaka-{wildcards.uuid}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{wildcards.uuid} -t {threads} -m {params.model}; mv medaka-{wildcards.uuid}/consensus.fasta {output}"
+        "export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}"
 
 rule download_dehumanizer_database:
     output:
@@ -341,7 +344,7 @@ rule install_flye:
         ok=touch("flye.ok"),
         d=directory("git/Flye"),
         flye_bin="bin/flye",
-    shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard eb89c9ef000f6dbcea426dcb430db92290546196; make; cp bin/flye ../../bin;"
+    shell: "cd git; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard af246d6a942bbc57fe02049bee92645f43c87b62; make; cp bin/flye ../../bin;"
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
 rule flye_assembly:

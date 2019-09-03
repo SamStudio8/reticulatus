@@ -14,3 +14,5 @@ slack_channel:
     "#general"
 cuda:
     False
+medaka_env:
+    "path/to/singularity/container"

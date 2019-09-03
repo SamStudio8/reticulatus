@@ -66,7 +66,11 @@ for line in stats_fh:
     fa = fields[0]
 
     uuid = fa.split('.')[0]
-    properties = uuid_manifest[uuid]
+
+    try:
+        properties = uuid_manifest[uuid]
+    except KeyError:
+        continue
 
     genome_size = int(fields[1])
     n_contigs = int(fields[2])
