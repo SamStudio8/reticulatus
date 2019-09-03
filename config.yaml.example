@@ -10,3 +10,5 @@ cuda:
     False
 medaka_env:
     "path/to/singularity/container"
+medaka_device:
+    0

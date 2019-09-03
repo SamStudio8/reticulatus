@@ -27,6 +27,10 @@ flye25 = deepcopy(flye_default)
 flye25.update({
     "hash": "af246d6a942bbc57fe02049bee92645f43c87b62",
 })
+flye25_0polish = deepcopy(flye25)
+flye25_0polish.update({
+    "iterations": 0,
+})
 
 
 redbean24 = deepcopy(wtdbg2_default)
@@ -37,6 +41,7 @@ redbean24.update({
 
 # lame way of doing this
 spells = {
+    "flye25-0polish" : flye25_0polish,
     "flye25" : flye25,
     "wtdbg2-24" : redbean24
 }

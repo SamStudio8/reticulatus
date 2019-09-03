@@ -109,11 +109,11 @@ for a in enumerate_assemblies(suffix=".fa"):
 
 rule finish:
     input:
-        #stat="assembly_stats.txt",
-        #meta="assembly_md5size.txt",
+        stat="assembly_stats.txt",
+        meta="assembly_md5size.txt",
         #kraken="kraken_summary.bond.tsv",
         #polished=enumerate_assemblies(unroll=False, suffix=".fa"),
-        #base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg")
+        base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg"),
         polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
 
 # new and improved version of this rule doesn't fucking nuke your input reads
@@ -191,7 +191,7 @@ rule polish_medaka:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
     shell:
-        "export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}"
+        "export CUDA_VISIBLE_DEVICES=%s; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}" % str(config["medaka_device"])
 
 rule download_dehumanizer_database:
     output:
@@ -297,12 +297,13 @@ rule flye_assembly:
         overlap=lambda w: '-m %s' % spells[w.conf]['m'] if spells[w.conf]['m'] != '-' else '',
         genome_size=lambda w: spells[w.conf]['genome_size'],
         d = "{uuid}.{conf,flye[A-z0-9_-]*}/",
+        iterations=lambda w: '--iterations %s' % spells[w.conf]['iterations'] if 'iterations' in spells[w.conf] else '',
     output:
         fa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly.fasta",
         gfa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
     threads: 24
     shell:
-        "git/{wildcards.conf}/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap}"
+        "git/{wildcards.conf}/Flye/bin/flye --nano-raw {input.reads} --meta --plasmids -g {params.genome_size} -o {params.d} -t {threads} {params.overlap} {params.iterations}"
 
 rule link_flye_assembly:
     input: "{uuid}.{conf}/assembly.fasta"
