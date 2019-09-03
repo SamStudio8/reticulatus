@@ -60,7 +60,7 @@ For each pipe you want to run, add a tab delimited line with the following field
 * `samplename` the reads to use, must be a key from the `reads.cfg`
 * `callmodel`, `extraction`, `community` and `platform` are legacy options that can be set to `-` for now
 * `spell` corresponds to a configuration in `spellbook.py`, this is where program versions and parameters are set
-* `polishpipe` the polishing strategy, strategies are of the format <program>-<readtype>-<iterations> and are chained with the `.` character. *e.g.* `racon-ont-4.medaka-ont-1.pilon-ill-1` will perform four rounds of iterative `racon` long-read polishing, followed by one round of medaka long-read polishing and finally one round of `pilon` short-read polishing. Currently the following polishers are supported: racon, medaka, pilon and dehumanizer.
+* `polishpipe` sets the polishing strategy, strategies are of the format `<program>-<readtype>-<iterations>` and are chained with the `.` character. *e.g.* `racon-ont-4.medaka-ont-1.pilon-ill-1` will perform four rounds of iterative `racon` long-read polishing, followed by one round of medaka long-read polishing and finally one round of `pilon` short-read polishing. Currently the following polishers are supported: racon, medaka, pilon and dehumanizer. No polishing can be acheived by setting to `-`.
 * `medakamodel` the option passed to `-m` for `medaka_consensus`
 
 #### Engage the pipeline
