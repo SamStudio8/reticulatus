@@ -161,11 +161,17 @@ def minimap2_mode(w):
     return mode
 
 
+def get_reads(w, readtype):
+    r = reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ][readtype]
+    if ':' in r:
+        r = r.split(':')[0]
+    return r
+
 def polish_reads_input(w):
     if w.readtype == "ont":
-        reads = reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]['ont']
+        reads = get_reads(w, 'ont')
     elif w.readtype == "ill":
-        reads = [reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["i1"], reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["i2"]]
+        reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
     return reads
 
 rule polish_racon:
@@ -290,7 +296,7 @@ rule install_flye_hash:
 rule flye_assembly:
     conda: "environments/flye.yaml"
     input:
-        reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
+        reads=lambda w: get_reads(w, 'ont'),
         ready=lambda w: "%s.ok" % samples.loc[w.uuid]["spell"],
     params:
         overlap=lambda w: '-m %s' % spells[w.conf]['m'] if spells[w.conf]['m'] != '-' else '',
@@ -356,7 +362,7 @@ rule install_wtdbg2_hash:
 
 rule wtdbg2_assembly:
     input:
-        reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
+        reads=lambda w: get_reads(w, 'ont'),
         ready="w2.ok"
     params:
         pmer=lambda w: spells[w.conf]['pmer'],
@@ -376,7 +382,7 @@ rule wtdbg2_assembly:
 
 rule wtdbg2_24_assembly:
     input:
-        reads=lambda w: reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ]["ont"],
+        reads=lambda w: get_reads(w, 'ont'),
         ready=lambda w: "%s.ok" % samples.loc[w.uuid]["spell"],
     params:
         prefix=lambda w: w.uuid+'.'+w.conf,
