@@ -118,22 +118,22 @@ rule finish:
 # new and improved version of this rule doesn't fucking nuke your input reads
 rule subset_reads:
     input:
-        "{fq}.fq.gz"
+        "{fq}.{ext}"
     output:
-        "{fq}.subset.{ratio}.fq.gz"
+        "{fq}.subset-{ratio,\d+}.{ext,(fq|fastq)(\.gz|)}"
     params:
         ratio=lambda w: float(w.ratio)/100
     shell:
-        "seqtk sample {input} {params.ratio} | gzip -1 > {output}"
+        "seqkit sample {input} -p {params.ratio} -o {output}"
 
 rule rmdup_reads:
     input:
-        "{fq}.fq.gz"
+        "{fq}.{ext}"
     output:
-        out="{fq}.rmdup.fq.gz",
-        dup="{fq}.dup.fq.gz",
+        out="{fq}.rmdup.{ext,(fq|fastq)(\.gz|)}",
+        dup="{fq}.dup.{ext,(fq|fastq)(\.gz|)}",
     shell:
-        "zcat {input} | seqkit rmdup -s -i -m -o {output.out} -d {output.dup}"
+        "seqkit rmdup -n -i {input} -o {output.out} -d {output.dup}"
 
 def input_polish(w, name):
     if int(w.iteration) > 1:
