@@ -115,6 +115,13 @@ rule finish:
         base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg"),
         polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
 
+rule merge_reads:
+    input: lambda w: get_reads(w, w.readtype, samplename=os.path.basename(w.samplename))
+    output:
+        "{samplename}.cat-{readtype,\w+}.{ext,(fq|fastq)(\.gz|)}"
+    shell:
+        "cat {input} > {output}"
+
 # new and improved version of this rule doesn't fucking nuke your input reads
 rule subset_reads:
     input:
@@ -161,10 +168,14 @@ def minimap2_mode(w):
     return mode
 
 
-def get_reads(w, readtype):
+def get_reads(w, readtype, samplename=None):
+    if samplename:
+        r = reads_lookup.loc[samplename][readtype]
+	return r.split(':')[1].split(',')
+
     r = reads_lookup.loc[ samples.loc[w.uuid]['samplename'] ][readtype]
     if ':' in r:
-        r = r.split(':')[0]
+        r = os.path.join(r.split(':')[0], '%s.cat-%s.fq.gz' % (samples.loc[w.uuid]['samplename'], readtype))
     return r
 
 def polish_reads_input(w):
