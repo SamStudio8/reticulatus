@@ -51,7 +51,7 @@ For each sample you have, add a tab delimited line with the following fields:
 | `*` | - | an arbitrary delimiter that has no purpose |
 ||| feel free to add your own columns for metadata here, fill your boots, reticulatus doesn't care |
 
-**\*** You can pre-process reads as follows:
+**\*** You can pre-process reads by modfying their file path as follows:
 
 | Option | Syntax | Description | 
 |--------|--------|-------------|
@@ -60,6 +60,7 @@ For each sample you have, add a tab delimited line with the following fields:
 | Merge reads | /path/to/merged/reads/:myreads.fq.gz,myotherreads.fq.gz,... | a root path for merged reads, followed by a colon and a comma delimited list of files to `cat` together, the filename will be chosen automatically and you should not be upset by this |
 
 Pre-processing can be chained, for example: `myreads.rmdup.subset-25.fq.gz`, will remove sequence name duplicates and take 25% of the result. You may also use this syntax to pre-process files for merging. Reticulatus will work out what needs to be done to generate the new read files, and will only need to do so once; even when you run the pipeline again in the future.
+The processed reads will be written to the same directory as the original reads. Once this has been done, you can delete the original reads yourself, if you'd like.
 
 **Important** If you're using the GPU, you must ensure the directories that contain your reads are bound to the singularity container with `-B` in `--singularity-args`, use the same path for inside as outside to make things easier.
 
@@ -99,10 +100,17 @@ snakemake -j <available_threads> --reason
 #### Advanced (GPU)
 
 Additionally you **must** specify `--use-singularity` to use containers **and** provide suitable `--singularity-args` to use the GPU and bind directories.
+Don't forget to use the GPU, you must set the `cuda` key to True in `config.cfg`.
 
 ```
 snakemake -j <available_threads> --reason --use-conda --use-singularity --singularity-args '--nv -B <dir_inside>:<dir_outside>' -k --restart-times 1
 ```
+
+Using the GPU will accelerate the following steps:
+
+* `polish_racon`: you will need a racon binary compiled with `CUDA`, for your system
+* `polish_medaka`: you will need to specify an appropriate singularity container, or install medaka with GPU support yourself
+
 
 ## Housekeeping
 
