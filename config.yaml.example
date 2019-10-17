@@ -10,5 +10,3 @@ cuda:
     False
 medaka_env:
     "library://samstudio8/default/cuda9-cudnn7-ubuntu1604-prom:test"
-medaka_device:
-    0

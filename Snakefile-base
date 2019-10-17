@@ -104,6 +104,18 @@ def enumerate_assemblies(w=None, suffix="", unroll=True, base_only=False):
             polished_assemblies.extend(context)
     return base_assemblies + polished_assemblies
 
+# TODO samstudio8
+# This function is fired during construction of the DAG when searching the parameter space of the GPU jobs,
+# it might be worth trying to catch the fact that execution hasn't started yet to suppress this output?
+def select_gpu_device(wildcards, resources):
+    if not config["cuda"]:
+        return None
+    import GPUtil
+    available = ",".join([str(x) for x in GPUtil.getAvailable(order = 'random', limit = resources.gpu, maxLoad = 0.5, maxMemory = 0.5, includeNan=False, excludeID=[], excludeUUID=[])])
+    print("Assigning %d available GPU devices: %s" % (resources.gpu, available))
+    return available
+
+
 for a in enumerate_assemblies(suffix=".fa"):
     sys.stderr.write("*\t%s\n" % a)
 
@@ -121,6 +133,7 @@ rule merge_reads:
         "{samplename}.cat-{readtype,\w+}.{ext,(fq|fastq)(\.gz|)}"
     shell:
         "cat {input} > {output}"
+    
 
 # new and improved version of this rule doesn't fucking nuke your input reads
 rule subset_reads:
@@ -185,16 +198,27 @@ def polish_reads_input(w):
         reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
     return reads
 
-rule polish_racon:
+rule minimap2_racon:
     input: contigs=input_polish_racon, reads=polish_reads_input
     params:
         mode=minimap2_mode,
-        cuda="--cudapoa-batches 8 --cuda-banded-alignment" if config["cuda"] else "",
+    threads: 12
+    output:
+        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.paf"
+    shell: "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}"
+
+rule polish_racon:
+    input: contigs=input_polish_racon, reads=polish_reads_input, paf="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.paf",
+    params:
+        cuda="--cudapoa-batches 16 --cudaaligner-batches 9" if config["cuda"] else "",
+        devices=select_gpu_device,
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: 12
+    threads: 4
+    resources:
+        gpu=2 if config["cuda"] else 0,
     shell:
-        "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}.paf; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {output}.paf {input.contigs} {params.cuda} > {output}"
+        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.paf} {input.contigs} {params.cuda} > {output}"
 
 rule polish_medaka:
     singularity: config["medaka_env"],
@@ -203,11 +227,14 @@ rule polish_medaka:
         prefix=lambda w: w.uuid+'.'+w.conf,
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
         batch="-b 100" if config["cuda"] else "",
+        devices=select_gpu_device,
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 12
+    resources:
+        gpu=1 if config["cuda"] else 0,
     shell:
-        "export CUDA_VISIBLE_DEVICES=%s; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}" % str(config["medaka_device"])
+        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}"
 
 rule download_dehumanizer_database:
     output:
