@@ -202,23 +202,28 @@ rule minimap2_racon:
     input: contigs=input_polish_racon, reads=polish_reads_input
     params:
         mode=minimap2_mode,
-    threads: 12
+        #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
+    threads: config["minimap2_threads"]
     output:
-        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.paf"
-    shell: "minimap2 -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}"
+        temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam")
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
+    shell: "minimap2 -K2G -a -2 -Q --sam-hit-only -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}"
+    #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
+
 
 rule polish_racon:
-    input: contigs=input_polish_racon, reads=polish_reads_input, paf="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.paf",
+    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam",
     params:
-        cuda="--cudapoa-batches 16 --cudaaligner-batches 9" if config["cuda"] else "",
+        cuda="--cudapoa-batches %d" % config["racon_batches"] if config["cuda"] else "",
         devices=select_gpu_device,
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: 4
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
+    threads: config["polish_threads"]
     resources:
-        gpu=2 if config["cuda"] else 0,
+        gpu=config["polish_gpu"] if config["cuda"] else 0,
     shell:
-        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.paf} {input.contigs} {params.cuda} > {output}"
+        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.overlaps} {input.contigs} {params.cuda} > {output}"
 
 rule polish_medaka:
     singularity: config["medaka_env"],
@@ -230,9 +235,10 @@ rule polish_medaka:
         devices=select_gpu_device,
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: 12
+    threads: config["polish_threads"]
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     resources:
-        gpu=1 if config["cuda"] else 0,
+        gpu=config["polish_gpu"] if config["cuda"] else 0,
     shell:
         "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}"
 
@@ -253,7 +259,7 @@ rule polish_dehumanizer:
         manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}dehumanizer-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: 3
+    threads: 2
     shell:
         "dehumanize {input.manifest} {input.contigs} {output}"
 
@@ -267,7 +273,8 @@ rule polish_pilon:
         mode=minimap2_mode,
     output:
         polish="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: 12
+    threads: config["polish_threads"]
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     shell:
         "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
 
@@ -318,6 +325,7 @@ rule kraken:
         out="{uuid}.{prefix}.fa.k2",
         rep="{uuid}.{prefix}.fa.k2r",
     threads: 8
+    benchmark: "benchmarks/{uuid}.{prefix}.fa.k2"
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
 
@@ -345,7 +353,8 @@ rule flye_assembly:
     output:
         fa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly.fasta",
         gfa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
-    threads: 24
+    threads: config["assembly_threads"]
+    benchmark: "benchmarks/{uuid}.{conf,flye[A-z0-9_-]*}_assembly.fa"
     shell:
         "git/{wildcards.conf}/Flye/bin/flye --nano-raw {input.reads} --meta {params.plasmids} -g {params.genome_size} -o {params.d} -t {threads} {params.overlap} {params.iterations}"
 
@@ -385,7 +394,8 @@ rule wtdbg2_consensus:
         "{uuid}.{conf}.ctg.lay.gz"
     output:
         "{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
-    threads: 12
+    threads: config["assembly_threads"]
+    benchmark: "benchmarks/{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtpoa-cns -f -i {input} -o {output} -t {threads}"
 
@@ -414,7 +424,8 @@ rule wtdbg2_assembly:
     output:
         lay="{uuid}.{conf,wtdbg2}.ctg.lay.gz",
         dot="{uuid}.{conf,wtdbg2}.ctg.dot.gz",
-    threads: 24
+    threads: config["assembly_threads"]
+    benchmark: "benchmarks/{uuid}.{conf,wtdbg2}.ctg.lay.gz"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
 
@@ -435,6 +446,7 @@ rule wtdbg2_24_assembly:
     output:
         lay="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz",
         dot="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
-    threads: 24
+    threads: config["assembly_threads"]
+    benchmark: "benchmarks/{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size} -t {threads}"
