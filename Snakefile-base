@@ -207,7 +207,8 @@ rule minimap2_racon:
     output:
         temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam")
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
-    shell: "minimap2 -K2G -a -2 -Q --sam-hit-only -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output}"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
+    shell: "minimap2 -a -2 -Q --sam-hit-only -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output} 2> {log}"
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
 
@@ -219,11 +220,12 @@ rule polish_racon:
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: config["polish_threads"]
     resources:
         gpu=config["polish_gpu"] if config["cuda"] else 0,
     shell:
-        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.overlaps} {input.contigs} {params.cuda} > {output}"
+        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.overlaps} {input.contigs} {params.cuda} > {output} 2> {log}"
 
 rule polish_medaka:
     singularity: config["medaka_env"],
@@ -237,10 +239,11 @@ rule polish_medaka:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     threads: config["polish_threads"]
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     resources:
-        gpu=config["polish_gpu"] if config["cuda"] else 0,
+        gpu=1 if config["cuda"] else 0,
     shell:
-        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch}; mv medaka-{params.prefix}/consensus.fasta {output}"
+        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch} > {log} 2>&1; mv medaka-{params.prefix}/consensus.fasta {output}"
 
 rule download_dehumanizer_database:
     output:
@@ -275,8 +278,9 @@ rule polish_pilon:
         polish="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: config["polish_threads"]
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
+    log: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     shell:
-        "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
+        "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/ 2> {log}; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
 
 rule summarise_assembly_stats:
     input:
@@ -355,8 +359,9 @@ rule flye_assembly:
         gfa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
     threads: config["assembly_threads"]
     benchmark: "benchmarks/{uuid}.{conf,flye[A-z0-9_-]*}_assembly.fa"
+    log: "log/{uuid}.{conf,flye[A-z0-9_-]*}_assembly.fa"
     shell:
-        "git/{wildcards.conf}/Flye/bin/flye --nano-raw {input.reads} --meta {params.plasmids} -g {params.genome_size} -o {params.d} -t {threads} {params.overlap} {params.iterations}"
+        "git/{wildcards.conf}/Flye/bin/flye --nano-raw {input.reads} --meta {params.plasmids} -g {params.genome_size} -o {params.d} -t {threads} {params.overlap} {params.iterations} > {log} 2>&1"
 
 rule link_flye_assembly:
     input: "{uuid}.{conf}/assembly.fasta"
