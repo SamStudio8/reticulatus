@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 master_default = {
-    "genome_size": "100m",
+    "genome_size": "62m",
 }
 
 flye_default = deepcopy(master_default)

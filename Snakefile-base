@@ -278,7 +278,7 @@ rule polish_pilon:
         polish="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     threads: config["polish_threads"]
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
-    log: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     shell:
         "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/ 2> {log}; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
 
