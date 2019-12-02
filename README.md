@@ -115,3 +115,7 @@ Using the GPU will accelerate the following steps:
 ## Housekeeping
 
 Unless otherwise stated by a suitable header, the files within this repository are made available under the MIT license. If you use this pipeline, an acknowledgement in your work would be nice... Don't forget to [cite Snakemake](https://snakemake.readthedocs.io/en/stable/project_info/citations.html).
+
+## Support
+
+If reticulatus has saved your computing bill, [maybe buy me a beer](https://www.buymeacoffee.com/samstudio8)?
