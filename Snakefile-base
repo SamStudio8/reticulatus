@@ -388,10 +388,10 @@ rule kraken:
     input:
         fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
     output:
-        out="{uuid}.{prefix}.fa.k2",
-        rep="{uuid}.{prefix}.fa.k2r",
+        out="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
+        rep="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2r",
     threads: 8
-    benchmark: "benchmarks/{uuid}.{prefix}.fa.k2"
+    benchmark: "benchmarks/{uuid,[A-z0-9_-]*}.{prefix}.fa.k2"
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
 
@@ -453,7 +453,7 @@ rule bandage_assembly:
         b="bandage.ok",
         gfa="{uuid}.{prefix}.gfa",
         assembly="{uuid}.{prefix}.fa"
-    output: "{uuid}.{prefix}.gfa.svg"
+    output: "{uuid,[A-z0-9_-]*}.{prefix}.gfa.svg"
     shell: "ware/bandage/Bandage image {input.gfa} {output}"
 
 rule wtdbg2_consensus:
