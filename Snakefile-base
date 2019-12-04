@@ -18,7 +18,6 @@ configfile: "config.yaml"
 # but there are exceptions like when reading cfg files and conda environments.
 workdir: "working/"
 
-
 onstart:
     print("snakefile: ", workflow.snakefile)
     os.makedirs('flags', exist_ok=True)
@@ -180,6 +179,7 @@ def select_gpu_device(wildcards, resources):
     print("Assigning %d available GPU devices: %s" % (resources.gpu, available))
     return available
 
+
 rule finish:
     input:
         tests=enumerate_assemblies(base_only=True, unroll=False, prefix="tests/", suffix=".test.txt"),
@@ -260,22 +260,52 @@ def polish_reads_input(w):
         reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
     return reads
 
-rule minimap2_racon:
+rule minimap2_racon_bam:
     input: contigs=input_polish_racon, reads=polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
     threads: config["minimap2_threads"]
     output:
-        temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam")
+        b=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"),
+        bai=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam.bai"),
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T {wildcards.uuid}-A -m 4G -@ {threads} -o {output.b}; samtools index {output.b};"
+    #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
+
+rule minimap2_racon_sam:
+    input: contigs=input_polish_racon, reads=polish_reads_input
+    params:
+        mode=minimap2_mode,
+        #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
+    threads: config["minimap2_threads"]
+    output:
+        s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"),
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
-    shell: "minimap2 -a -2 -Q --sam-hit-only -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output} 2> {log}"
-    #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output.s} 2> {log}"
+
+rule minimap2_racon_subsample:
+    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam",
+        bai="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam.bai"
+    output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.sam"),
+        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fa",
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.sam"
+    threads: config["minimap2_threads"]
+    shell: "subsample_bam {input.b} 250 -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B -m 4G -O SAM -o {output.s} -@ {threads}"
+
+#rule minimap2_racon_subsample_fq:
+#    input:
+#        reads=polish_reads_input,
+#	fq="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fq"
+#    output:
+#        temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fq")
+#    threads: config["minimap2_threads"]
+#    shell: "zcat {input.reads} | seqkit grep -f {input.fql} | pigz > {output}"
 
 
 rule polish_racon:
-    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam",
+    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam", #reads2="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fa",
     params:
         cuda="--cudapoa-batches %d" % config["racon_batches"] if config["cuda"] else "",
         devices=select_gpu_device,
@@ -342,7 +372,7 @@ rule polish_pilon:
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     shell:
-        "echo {input.reads}; minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/ 2> {log}; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
+        "minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} -m 2G -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/ 2> {log}; mv pilon-{wildcards.uuid}/pilon.fasta {output}"
 
 rule summarise_assembly_stats:
     input:
@@ -366,7 +396,7 @@ rule bond_summarise_kraken:
     output:
         "kraken_summary.bond.tsv"
     shell:
-        "bond {input} ../manifest.cfg > {output}"
+        "bond {input} ../manifest.cfg > {output};"
 
 rule summarise_kraken:
     input:
@@ -404,6 +434,8 @@ rule install_flye_hash:
     params:
         hash=lambda w: spells[w.conf]["hash"],
     shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard {params.hash}; make"
+
+
 
 rule flye_assembly:
     conda: "environments/flye.yaml"
@@ -522,3 +554,4 @@ rule test_assembly:
     input: "{uuid}.{conf}.ctg.cns.fa"
     output: "tests/{uuid}.{conf}.ctg.cns.test.txt"
     shell: "touch {output}"
+
