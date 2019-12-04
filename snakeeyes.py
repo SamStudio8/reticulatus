@@ -18,10 +18,18 @@ for line in open(os.path.join(FLAG_PATH, "q.txt")):
 
     times = ['-', '-']
     if os.path.exists(start_p):
-        times[0] = datetime.fromtimestamp(os.path.getmtime(start_p)).strftime('%Y-%m-%d_%H:%M:%S')
+        times[0] = datetime.fromtimestamp(os.path.getmtime(start_p))
 
     if os.path.exists(finish_p):
-        times[1] = datetime.fromtimestamp(os.path.getmtime(finish_p)).strftime('%Y-%m-%d_%H:%M:%S')
+        times[1] = datetime.fromtimestamp(os.path.getmtime(finish_p))
+
+    if times[0] != '-':
+        if times[0] < times[1]:
+            times[0] = times[0].strftime('%Y-%m-%d_%H:%M:%S')
+            times[1] = times[1].strftime('%Y-%m-%d_%H:%M:%S')
+        else:
+            times[0] = times[0].strftime('%Y-%m-%d_%H:%M:%S')
+            times[1] = '-'
 
     fields.extend(times)
     print("\t".join(fields))
