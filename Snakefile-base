@@ -23,7 +23,7 @@ onstart:
     os.makedirs('flags', exist_ok=True)
 
     job_bins = {}
-    for job in workflow.dag.jobs:
+    for job in workflow.persistence.dag.jobs:
         sample = job.wildcards.get('uuid', 'default')
         if sample not in job_bins:
             job_bins[sample] = []
@@ -48,19 +48,19 @@ onstart:
         if ptr["__depth"] < depth:
             ptr["__depth"] = depth
 
-        deps = workflow.dag.depending[job]
+        deps = workflow.persistence.dag.depending[job]
         for job in deps:
-            #if job in workflow.dag.needrun_jobs:
+            #if job in workflow.persistence.dag.needrun_jobs:
             tree_sjob(job, ptr, depth+1)
 
-    finish = next(workflow.dag.jobs)
+    finish = next(workflow.persistence.dag.jobs)
     if finish.name != "finish":
         print("Not like this."); sys.exit(80);
 
     for sample in job_bins:
         if sample == "default": continue
         for job in job_bins[sample]:
-            waiting = set(workflow.dag.dependencies[job]).intersection(workflow.dag.needrun_jobs)
+            waiting = set(workflow.persistence.dag.dependencies[job]).intersection(workflow.persistence.dag.needrun_jobs)
             if len(waiting) == 0 or (len(waiting) == 1 and finish in waiting):
                 tree_sjob(job, sample=sample)
     
@@ -70,8 +70,8 @@ onstart:
             if job in seen or str(job).startswith("__"):
                 continue
             seen.add(job)
-            print("\t".join([str(x) for x in [head[job]["__depth"], '*' if job in workflow.dag.needrun_jobs else '-', job.jobid, job.rule]]))
-            status_fh.write("\t".join([str(x) for x in [sample, head[job]["__depth"], '*' if job in workflow.dag.needrun_jobs else '-', job.jobid, job.rule]]) + '\n')
+            print("\t".join([str(x) for x in [head[job]["__depth"], '*' if job in workflow.persistence.dag.needrun_jobs else '-', job.jobid, job.rule]]))
+            status_fh.write("\t".join([str(x) for x in [sample, head[job]["__depth"], '*' if job in workflow.persistence.dag.needrun_jobs else '-', job.jobid, job.rule]]) + '\n')
             print_sjob(head[job], seen, depth+1, sample)
     
     for sample in sample_deps:
