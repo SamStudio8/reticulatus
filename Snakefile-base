@@ -396,7 +396,7 @@ rule bond_summarise_kraken:
     output:
         "kraken_summary.bond.tsv"
     shell:
-        "bond {input} ../manifest.cfg > {output};"
+        "bond {input} ../manifest.cfg > {output}"
 
 rule summarise_kraken:
     input:
