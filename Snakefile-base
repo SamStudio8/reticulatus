@@ -5,6 +5,7 @@ import time
 from spellbook import spells
 from shell import shell # override the default shell
 
+
 shell.executable('bash')
 shell.prefix("touch flags/{jobid}.start; ")
 shell.suffix("; touch flags/{jobid}.finish;")
@@ -19,6 +20,12 @@ configfile: "config.yaml"
 workdir: "working/"
 
 onstart:
+    import snakemake.benchmark
+    import benchmark as rbenchmark
+    snakemake.benchmark.BenchmarkRecord = rbenchmark.BenchmarkRecord
+    snakemake.benchmark.benchmarked = rbenchmark.benchmarked
+    sys.modules['snakemake.benchmark'] = snakemake.benchmark
+
     print("snakefile: ", workflow.snakefile)
     os.makedirs('flags', exist_ok=True)
 

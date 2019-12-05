@@ -61,12 +61,10 @@ class shell:
 
     @classmethod
     def prefix(cls, prefix):
-        #cls._process_prefix = format(prefix, stepout=2)
         cls._process_prefix = prefix
 
     @classmethod
     def suffix(cls, suffix):
-        #cls._process_suffix = format(suffix, stepout=2)
         cls._process_suffix = suffix
 
     @classmethod
@@ -87,10 +85,6 @@ class shell:
         if "stepout" in kwargs:
             raise KeyError("Argument stepout is not allowed in shell command.")
         cmd = format(cmd, *args, stepout=2, **kwargs)
-
-        cmd_prefix = format(cls._process_prefix, stepout=2)
-        cmd_suffix = format(cls._process_suffix, stepout=2)
-
         context = inspect.currentframe().f_back.f_locals
         print(context)
 
@@ -108,7 +102,9 @@ class shell:
         shadow_dir = context.get("shadow_dir", None)
 
         cmd = "{} {} {}".format(
-            cmd_prefix, cmd.strip(), cmd_suffix
+            format(cls._process_prefix, *args, stepout=2, **kwargs),
+            cmd.strip(),
+            format(cls._process_suffix, *args, stepout=2, **kwargs),
         ).strip()
         print(cmd)
 
@@ -149,9 +145,16 @@ class shell:
         if read:
             ret = proc.stdout.read()
         if bench_record is not None:
-            from snakemake.benchmark import benchmarked
+            from benchmark import benchmarked
 
-            with benchmarked(proc.pid, bench_record):
+            gpu=None
+            try:
+                gpu = [int(x) for x in context.get("params").devices.split(",")]
+                print("[snakeshell] Attempting to benchmark GPU process with GPUtil on devices: %s" % gpu)
+            except Exception as e:
+                print(e)
+                pass
+            with benchmarked(proc.pid, bench_record, gpus=gpu):
                 retcode = proc.wait()
         else:
             retcode = proc.wait()
@@ -190,3 +193,4 @@ if os.name == "posix":
             shell.executable("sh")
     else:
         shell.executable("bash")
+
