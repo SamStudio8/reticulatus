@@ -157,10 +157,8 @@ def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=Fa
     polished_assemblies = []
     for uuid in samples["uuid"]:
         conf = samples.loc[uuid]["spell"]
-        #base_uuid = uuid
-        #if samples.loc[uuid]["useassembly"]:
-        #    base_uuid = samples.loc[uuid]["useassembly"]
-        base_assemblies.append( "%s%s.%s.ctg.cns%s" % (prefix, uuid, conf, suffix) )
+        if samples.loc[uuid]["repolish"] == '-':
+            base_assemblies.append( "%s%s.%s.ctg.cns%s" % (prefix, uuid, conf, suffix) )
 
         if samples.loc[uuid]["polishpipe"] != '-' and not base_only:
             unrolled = unroll_assemblies(w, samples.loc[uuid]["polishpipe"], unroll=unroll)
@@ -187,7 +185,7 @@ rule finish:
         meta="assembly_md5size.txt",
         kraken="kraken_summary.bond.tsv",
         base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg"),
-        #polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
+        polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
 
 rule merge_reads:
     input: lambda w: get_reads(w, w.readtype, samplename=os.path.basename(w.samplename))
@@ -221,7 +219,11 @@ def input_polish(w, name):
     if int(w.iteration) > 1:
         contigs = "%s.%s.ctg.cns.%s%s-%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, name, w.readtype, int(w.iteration)-1)
     elif w.polishedprefix=="":
-        contigs = "%s.%s.ctg.cns.fa" % (w.uuid, w.conf)
+        # Polish existing assembly if repolish is set
+        polish_uuid = w.uuid
+        if samples.loc[w.uuid]["repolish"] != '-':
+            polish_uuid = samples.loc[w.uuid]["repolish"]
+        contigs = "%s.%s.ctg.cns.fa" % (polish_uuid, w.conf)
     else:
         contigs = "%s.%s.ctg.cns.%sfa" % (w.uuid, w.conf, w.polishedprefix)
     return contigs
