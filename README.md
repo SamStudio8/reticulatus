@@ -15,6 +15,7 @@ Initalise which pipeline you want. It will almost always be `Snakefile-base` for
 ```
 cp Snakefile-base Snakefile
 ```
+**Note** It's now quite important that you ensure you install the `snakemake-minimal` package using the environment specified above. Not only is this easier, but it ensures that the version installed is suitable for the overriden `shell.py` that now ships with `reticulatus`.
 
 ### (2) Write your configuation
 
