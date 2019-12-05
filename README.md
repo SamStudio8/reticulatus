@@ -100,7 +100,14 @@ snakemake -j <available_threads> --reason
 
 #### Advanced (GPU)
 
-Additionally you **must** specify `--use-singularity` to use containers **and** provide suitable `--singularity-args` to use the GPU and bind directories. You should also set `--resources gpu=N` where `N` is the number of GPU interfaces shown in `nvidia-smi`.
+Additionally you **must** specify `--use-singularity` to use containers **and** provide suitable `--singularity-args` to use the GPU and bind directories. You must bind the directory into which you have cloned reticulatus, as well as any other directories that contain your reads. Set the `dir_inside` and `dir_outside` keys to the same path to ensure the file paths inside the container, match those on the outside of the container.
+
+*e.g.* 
+```
+'--nv -B /data/sam-projects/reticulatus-testing/:/data/sam-projects/reticulatus-testing/ -B /path/to/reads/dir/:/path/to/reads/dir/ -B /path/to/more/reads/dir/:/path/to/more/reads/dir/'
+```
+
+You should also set `--resources gpu=N` where `N` is the number of GPU interfaces shown in `nvidia-smi`.
 Don't forget to use the GPU, you must set the `cuda` key to True in `config.cfg`.
 
 ```
