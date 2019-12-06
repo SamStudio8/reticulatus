@@ -57,17 +57,27 @@ class BenchmarkRecord:
         cpu_seconds=None,
         max_gpu_load=None,
         max_gpu_mem=None,
+        rss=None,
+        vms=None,
+        uss=None,
+        pss=None,
+        gpu_load=None,
+        gpu_mem=None,
     ):
         #: Running time in seconds
         self.running_time = running_time or 0
         #: Maximal RSS in MB
         self.max_rss = max_rss
+        self.rss = rss
         #: Maximal VMS in MB
         self.max_vms = max_vms
+        self.vms = vms
         #: Maximal USS in MB
         self.max_uss = max_uss
+        self.uss = uss
         #: Maximal PSS in MB
         self.max_pss = max_pss
+        self.pss = pss
         #: I/O read in bytes
         self.io_in = io_in
         #: I/O written in bytes
@@ -80,9 +90,11 @@ class BenchmarkRecord:
         self.prev_time = None
 
         self.max_gpu_load = max_gpu_load
+        self.gpu_load = gpu_load
         self.max_gpu_mem = max_gpu_mem
+        self.gpu_mem = gpu_mem
 
-    def to_tsv(self):
+    def to_tsv(self, rt=False):
         """Return ``str`` with the TSV representation of this record"""
 
         def to_tsv_str(x):
@@ -109,24 +121,44 @@ class BenchmarkRecord:
                 s = ("%d day%s, " % plural(x.days)) + s
             return s
 
-        return "\t".join(
-            map(
-                to_tsv_str,
-                (
-                    "{:.4f}".format(self.running_time),
-                    timedelta_to_str(datetime.timedelta(seconds=self.running_time)),
-                    self.max_rss,
-                    self.max_vms,
-                    self.max_uss,
-                    self.max_pss,
-                    self.io_in,
-                    self.io_out,
-                    100.0 * self.cpu_seconds / self.running_time,
-                    self.max_gpu_load,
-                    self.max_gpu_mem,
-                ),
+        if rt:
+            return "\t".join(
+                map(
+                    to_tsv_str,
+                    (
+                        "{:.4f}".format(self.running_time),
+                        timedelta_to_str(datetime.timedelta(seconds=self.running_time)),
+                        self.rss,
+                        self.vms,
+                        self.uss,
+                        self.pss,
+                        self.io_in,
+                        self.io_out,
+                        100.0 * self.cpu_seconds / self.running_time,
+                        self.gpu_load,
+                        self.gpu_mem,
+                    ),
+                )
             )
-        )
+        else:
+            return "\t".join(
+                map(
+                    to_tsv_str,
+                    (
+                        "{:.4f}".format(self.running_time),
+                        timedelta_to_str(datetime.timedelta(seconds=self.running_time)),
+                        self.max_rss,
+                        self.max_vms,
+                        self.max_uss,
+                        self.max_pss,
+                        self.io_in,
+                        self.io_out,
+                        100.0 * self.cpu_seconds / self.running_time,
+                        self.max_gpu_load,
+                        self.max_gpu_mem,
+                    ),
+                )
+            )
 
 
 class DaemonTimer(threading.Thread):
@@ -217,6 +249,8 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
             self.gpus = gpus
             self.bench_record.max_gpu_load = [-1] * len(gpus)
             self.bench_record.max_gpu_mem = [-1] * len(gpus)
+            self.bench_record.gpu_load = [-1] * len(gpus)
+            self.bench_record.gpu_mem = [-1] * len(gpus)
         if rt_path:
             self._rtpath = rt_path
             write_benchmark_records([], self._rtpath, head=True)
@@ -232,7 +266,7 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
             pass  # skip, process died in flight
 
         if self._rtpath:
-            write_benchmark_records([self.bench_record], self._rtpath, head=False, mode='a')
+            write_benchmark_records([self.bench_record], self._rtpath, head=False, mode='a', rt=True)
 
     def _update_record(self):
         """Perform the actual measurement"""
@@ -296,12 +330,19 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
                 gpu_mem = GPUtil.getGPUs()[gpu].memoryUsed # MB
                 self.bench_record.max_gpu_load[gpu_i] = max(self.bench_record.max_gpu_load[gpu_i] or 0, gpu_load)
                 self.bench_record.max_gpu_mem[gpu_i] = max(self.bench_record.max_gpu_mem[gpu_i] or 0, gpu_mem)
+                self.bench_record.gpu_load[gpu_i] = gpu_load
+                self.bench_record.gpu_mem[gpu_i] = gpu_mem
 
         # Update benchmark record's RSS and VMS
         self.bench_record.max_rss = max(self.bench_record.max_rss or 0, rss)
         self.bench_record.max_vms = max(self.bench_record.max_vms or 0, vms)
         self.bench_record.max_uss = max(self.bench_record.max_uss or 0, uss)
         self.bench_record.max_pss = max(self.bench_record.max_pss or 0, pss)
+        self.bench_record.rss = rss
+        self.bench_record.vms = vms
+        self.bench_record.uss = uss
+        self.bench_record.pss = pss
+
         self.bench_record.io_in = io_in
         self.bench_record.io_out = io_out
         self.bench_record.cpu_seconds += cpu_seconds
@@ -336,15 +377,15 @@ def benchmarked(pid=None, benchmark_record=None, interval=BENCHMARK_INTERVAL, gp
         result.running_time = time.time() - start_time
 
 
-def print_benchmark_records(records, file_, head=True):
+def print_benchmark_records(records, file_, head=True, rt=False):
     """Write benchmark records to file-like object"""
     if head:
         print(BenchmarkRecord.get_header(), file=file_)
     for r in records:
-        print(r.to_tsv(), file=file_)
+        print(r.to_tsv(rt=rt), file=file_)
 
 
-def write_benchmark_records(records, path, head=True, mode="w"):
+def write_benchmark_records(records, path, head=True, mode="w", rt=False):
     """Write benchmark records to file at path"""
     with open(path, mode) as f:
-        print_benchmark_records(records, f, head=head)
+        print_benchmark_records(records, f, head=head, rt=rt)
