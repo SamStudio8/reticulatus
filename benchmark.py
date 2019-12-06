@@ -59,7 +59,7 @@ class BenchmarkRecord:
         max_gpu_mem=None,
     ):
         #: Running time in seconds
-        self.running_time = running_time
+        self.running_time = running_time or 0
         #: Maximal RSS in MB
         self.max_rss = max_rss
         #: Maximal VMS in MB
@@ -164,9 +164,12 @@ class ScheduledPeriodicTimer:
         self._timer = None
         self._stopped = True
         self._gpu = False
+        self._rtpath = None
+        self.start_time = None
 
     def start(self):
         """Start the intervalic timer"""
+        self.start_time = time.time()
         self.work()
         self._times_called += 1
         self._stopped = False
@@ -199,7 +202,7 @@ class ScheduledPeriodicTimer:
 class BenchmarkTimer(ScheduledPeriodicTimer):
     """Allows easy observation of a given PID for resource usage"""
 
-    def __init__(self, pid, bench_record, interval=BENCHMARK_INTERVAL, gpus=None):
+    def __init__(self, pid, bench_record, interval=BENCHMARK_INTERVAL, gpus=None, rt_path=None):
         ScheduledPeriodicTimer.__init__(self, interval)
         #: PID of observed process
         self.pid = pid
@@ -214,6 +217,10 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
             self.gpus = gpus
             self.bench_record.max_gpu_load = [-1] * len(gpus)
             self.bench_record.max_gpu_mem = [-1] * len(gpus)
+        if rt_path:
+            self._rtpath = rt_path
+            write_benchmark_records([], self._rtpath, head=True)
+
 
     def work(self):
         """Write statistics"""
@@ -223,6 +230,9 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
             pass  # skip, process died in flight
         except AttributeError:
             pass  # skip, process died in flight
+
+        if self._rtpath:
+            write_benchmark_records([self.bench_record], self._rtpath, head=False, mode='a')
 
     def _update_record(self):
         """Perform the actual measurement"""
@@ -241,6 +251,7 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
         # Iterate over process and all children
         try:
             this_time = time.time()
+            self.bench_record.running_time = this_time - self.start_time
             for proc in chain((self.main,), self.main.children(recursive=True)):
                 proc = self.procs.setdefault(proc.pid, proc)
                 with proc.oneshot():
@@ -297,7 +308,7 @@ class BenchmarkTimer(ScheduledPeriodicTimer):
 
 
 @contextlib.contextmanager
-def benchmarked(pid=None, benchmark_record=None, interval=BENCHMARK_INTERVAL, gpus=None):
+def benchmarked(pid=None, benchmark_record=None, interval=BENCHMARK_INTERVAL, gpus=None, rt_path=None):
     """Measure benchmark parameters while within the context manager
 
     Yields a ``BenchmarkRecord`` with the results (values are set after
@@ -318,21 +329,22 @@ def benchmarked(pid=None, benchmark_record=None, interval=BENCHMARK_INTERVAL, gp
         yield result
     else:
         start_time = time.time()
-        bench_thread = BenchmarkTimer(int(pid or os.getpid()), result, interval, gpus=gpus)
+        bench_thread = BenchmarkTimer(int(pid or os.getpid()), result, interval, gpus=gpus, rt_path=rt_path)
         bench_thread.start()
         yield result
         bench_thread.cancel()
         result.running_time = time.time() - start_time
 
 
-def print_benchmark_records(records, file_):
+def print_benchmark_records(records, file_, head=True):
     """Write benchmark records to file-like object"""
-    print(BenchmarkRecord.get_header(), file=file_)
+    if head:
+        print(BenchmarkRecord.get_header(), file=file_)
     for r in records:
         print(r.to_tsv(), file=file_)
 
 
-def write_benchmark_records(records, path):
+def write_benchmark_records(records, path, head=True, mode="w"):
     """Write benchmark records to file at path"""
-    with open(path, "wt") as f:
-        print_benchmark_records(records, f)
+    with open(path, mode) as f:
+        print_benchmark_records(records, f, head=head)

@@ -147,14 +147,21 @@ class shell:
         if bench_record is not None:
             from benchmark import benchmarked
 
-            gpu=None
+            gpu = None
             try:
                 gpu = [int(x) for x in context.get("params").devices.split(",")]
                 print("[snakeshell] Attempting to benchmark GPU process with GPUtil on devices: %s" % gpu)
             except Exception as e:
-                print(e)
                 pass
-            with benchmarked(proc.pid, bench_record, gpus=gpu):
+
+            rt_bench_path = None
+            try:
+                rt_bench_path = context.get("output").rtbench
+                print("[snakeshell] Attempting to benchmark in real-time to: %s" % rt_bench_path)
+            except Exception as e:
+                pass
+
+            with benchmarked(proc.pid, bench_record, gpus=gpu, rt_path=rt_bench_path):
                 retcode = proc.wait()
         else:
             retcode = proc.wait()
