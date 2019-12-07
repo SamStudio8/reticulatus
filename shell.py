@@ -161,7 +161,7 @@ class shell:
             except Exception as e:
                 pass
 
-            with benchmarked(proc.pid, bench_record, gpus=gpu, rt_path=rt_bench_path):
+            with benchmarked(proc.pid, bench_record, gpus=gpu, rt_path=rt_bench_path, interval=15):
                 retcode = proc.wait()
         else:
             retcode = proc.wait()
