@@ -7,7 +7,7 @@ from shell import shell # override the default shell
 
 
 shell.executable('bash')
-shell.prefix("touch flags/{jobid}.start; ")
+shell.prefix("touch flags/{jobid}.start; python3 ../scripts/drop_cache_client.py; ")
 shell.suffix("; touch flags/{jobid}.finish;")
 
 # Import config
@@ -177,7 +177,7 @@ def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=Fa
 # This function is fired during construction of the DAG when searching the parameter space of the GPU jobs,
 # it might be worth trying to catch the fact that execution hasn't started yet to suppress this output?
 def select_gpu_device(wildcards, resources):
-    if not config["cuda"]:
+    if not config["cuda"] or resources.gpu == 0:
         return None
     import GPUtil
     available = ",".join([str(x) for x in GPUtil.getAvailable(order = 'random', limit = resources.gpu, maxLoad = 0.5, maxMemory = 0.5, includeNan=False, excludeID=[], excludeUUID=[])])
@@ -269,15 +269,40 @@ def polish_reads_input(w):
         reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
     return reads
 
+def n_threads(w, key=""):
+    n_threads = workflow.global_resources['_cores']
+    if samples.loc[w.uuid]["cpu"] != '-':
+        try:
+            n_threads = int(samples.loc[w.uuid]["cpu"])
+        except ValueError:
+            pass
+    elif key in config:
+        n_threads = config[key]
+    return n_threads
+
+def n_gpu(w, key=""):
+    import GPUtil
+    n_gpu = workflow.global_resources.get('gpu', len(GPUtil.getGPUs()))
+    if samples.loc[w.uuid]["gpu"] != '-':
+        try:
+            n_gpu = int(samples.loc[w.uuid]["gpu"])
+        except ValueError:
+            pass
+    elif key in config:
+        n_gpu = config[key]
+    return n_gpu
+
 rule minimap2_racon_bam:
     input: contigs=input_polish_racon, reads=polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
-    threads: config["minimap2_threads"]
+    threads: lambda w: n_threads(w, "minimap2_threads")
     output:
         b=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"),
         bai=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam.bai"),
+    resources:
+        benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T {wildcards.uuid}-A -m 4G -@ {threads} -o {output.b}; samtools index {output.b};"
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
@@ -287,7 +312,9 @@ rule minimap2_racon_sam:
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
-    threads: config["minimap2_threads"]
+    threads: lambda w: n_threads(w, "minimap2_threads")
+    resources:
+        benchmark=1,
     output:
         s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"),
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
@@ -300,7 +327,9 @@ rule minimap2_racon_subsample:
     output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.sam"),
         fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fa",
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.sam"
-    threads: config["minimap2_threads"]
+    threads: lambda w: n_threads(w, "minimap2_threads")
+    resources:
+        benchmark=1,
     shell: "subsample_bam {input.b} 250 -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B -m 4G -O SAM -o {output.s} -@ {threads}"
 
 #rule minimap2_racon_subsample_fq:
@@ -309,24 +338,26 @@ rule minimap2_racon_subsample:
 #	fq="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fq"
 #    output:
 #        temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fq")
-#    threads: config["minimap2_threads"]
+#    threads: lambda w: n_threads(w, "minimap2_threads")
 #    shell: "zcat {input.reads} | seqkit grep -f {input.fql} | pigz > {output}"
 
 
 rule polish_racon:
     input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam", #reads2="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fa",
     params:
-        cuda="--cudapoa-batches %d" % config["racon_batches"] if config["cuda"] else "",
+        cuda=lambda w: "--cudapoa-batches %d" % config["racon_batches"] if n_gpu(w, "polish_gpu") > 0 else "",
         devices=select_gpu_device,
     output:
-        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
+        out="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa",
+        rtbench="rtbenchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa",
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: config["polish_threads"]
+    threads: lambda w: n_threads(w, "polish_threads")
     resources:
-        gpu=config["polish_gpu"] if config["cuda"] else 0,
+        gpu=lambda w: n_gpu(w, "polish_gpu"),
+        benchmark=1,
     shell:
-        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.overlaps} {input.contigs} {params.cuda} > {output} 2> {log}"
+        "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.overlaps} {input.contigs} {params.cuda} > {output.out} 2> {log}"
 
 rule polish_medaka:
     singularity: config["medaka_env"],
@@ -334,15 +365,16 @@ rule polish_medaka:
     params:
         prefix=lambda w: w.uuid+'.'+w.conf,
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
-        batch="-b 100" if config["cuda"] else "",
+        batch=lambda w: "-b 100" if n_gpu(w, "polish_gpu") > 0 else "",
         devices=select_gpu_device,
     output:
         "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: config["polish_threads"]
+    threads: lambda w: n_threads(w, "polish_threads")
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     resources:
-        gpu=1 if config["cuda"] else 0,
+        gpu=lambda w: n_gpu(w, "polish_gpu"),
+        benchmark=1,
     shell:
         "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch} > {log} 2>&1; mv medaka-{params.prefix}/consensus.fasta {output}"
 
@@ -377,7 +409,9 @@ rule polish_pilon:
         mode=minimap2_mode,
     output:
         polish="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
-    threads: config["polish_threads"]
+    threads: lambda w: n_threads(w, "polish_threads")
+    resources:
+        benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
     shell:
@@ -430,6 +464,8 @@ rule kraken:
         out="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
         rep="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2r",
     threads: 8
+    resources:
+        benchmark=1, # Don't let this RAM pig near our assembly and polishing benchmarks
     benchmark: "benchmarks/{uuid,[A-z0-9_-]*}.{prefix}.fa.k2"
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
@@ -460,7 +496,9 @@ rule flye_assembly:
     output:
         fa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly.fasta",
         gfa = "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
-    threads: config["assembly_threads"]
+    threads: lambda w: n_threads(w, "assembly_threads")
+    resources:
+        benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf,flye[A-z0-9_-]*}_assembly.fa"
     log: "log/{uuid}.{conf,flye[A-z0-9_-]*}_assembly.fa"
     shell:
@@ -502,7 +540,9 @@ rule wtdbg2_consensus:
         "{uuid}.{conf}.ctg.lay.gz"
     output:
         "{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
-    threads: config["assembly_threads"]
+    threads: lambda w: n_threads(w, "assembly_threads")
+    resources:
+        benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.cns.fa"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtpoa-cns -f -i {input} -o {output} -t {threads}"
@@ -532,7 +572,9 @@ rule wtdbg2_assembly:
     output:
         lay="{uuid}.{conf,wtdbg2}.ctg.lay.gz",
         dot="{uuid}.{conf,wtdbg2}.ctg.dot.gz",
-    threads: config["assembly_threads"]
+    threads: lambda w: n_threads(w, "assembly_threads")
+    resources:
+        benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf,wtdbg2}.ctg.lay.gz"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -t {threads}"
@@ -554,7 +596,9 @@ rule wtdbg2_24_assembly:
     output:
         lay="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz",
         dot="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
-    threads: config["assembly_threads"]
+    threads: lambda w: n_threads(w, "assembly_threads")
+    resources:
+        benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size} -t {threads}"
