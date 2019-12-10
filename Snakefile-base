@@ -7,7 +7,7 @@ from shell import shell # override the default shell
 
 
 shell.executable('bash')
-shell.prefix("touch flags/{jobid}.start; python3 ../scripts/drop_cache_client.py; ")
+shell.prefix("set -euo pipefail; touch flags/{jobid}.start; python3 ../scripts/drop_cache_client.py; ")
 shell.suffix("; touch flags/{jobid}.finish;")
 
 # Import config
