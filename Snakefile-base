@@ -308,7 +308,7 @@ rule minimap2_racon_bam:
     resources:
         benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T {wildcards.uuid}-A -m 4G -@ {threads} -o {output.b}; samtools index {output.b};"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T {wildcards.uuid}-A -m 4G -@ {threads} -o {output.b}; samtools index {output.b}"
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
 rule minimap2_racon_sam:
@@ -515,7 +515,7 @@ rule link_flye_assembly:
 
 rule install_bandage_linux:
     output: ok=touch("bandage.ok"), b="ware/bandage/Bandage",
-    shell: "cd ware; wget https://github.com/rrwick/Bandage/releases/download/v0.8.1/Bandage_Ubuntu_static_v0_8_1.zip; unzip Bandage_Ubuntu_static_v0_8_1.zip -d bandage;"
+    shell: "cd ware; wget https://github.com/rrwick/Bandage/releases/download/v0.8.1/Bandage_Ubuntu_static_v0_8_1.zip; unzip Bandage_Ubuntu_static_v0_8_1.zip -d bandage"
 
 rule prep_wtdbg2_gfa:
     input:
@@ -558,7 +558,7 @@ rule install_wtdbg2_hash:
         #w2_poa="git/{conf,wtdbg2[A-z0-9_-]*}/wtdbg2/wtpoa-cns",
     params:
         hash=lambda w: spells[w.conf]["hash"],
-    shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard {params.hash}; make;"
+    shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/ruanjue/wtdbg2.git; cd wtdbg2; git reset --hard {params.hash}; make"
 
 rule wtdbg2_assembly:
     input:
