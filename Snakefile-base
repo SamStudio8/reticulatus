@@ -5,10 +5,7 @@ import time
 from spellbook import spells
 from shell import shell # override the default shell
 
-
 shell.executable('bash')
-shell.prefix("set -euo pipefail; touch flags/{jobid}.start; python3 ../scripts/drop_cache_client.py; ")
-shell.suffix("; touch flags/{jobid}.finish;")
 
 # Import config
 configfile: "config.yaml"
@@ -20,6 +17,13 @@ configfile: "config.yaml"
 workdir: "working/"
 
 onstart:
+    rprefix = "set -euo pipefail; touch flags/{jobid}.start; "
+    if workflow.global_resources.get('benchmark', False):
+        rprefix += "python3 ../scripts/drop_cache_client.py; "
+
+    shell.prefix(rprefix)
+    shell.suffix("; touch flags/{jobid}.finish;")
+
     import snakemake.benchmark
     import benchmark as rbenchmark
     snakemake.benchmark.BenchmarkRecord = rbenchmark.BenchmarkRecord
