@@ -63,3 +63,14 @@ rule checkm:
     conda: "environments/checkm.yaml"
     threads: 8
     shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.res}"
+
+
+#rule nl_align_ref:
+#    shell: "minimap2 -a -x map-ont -t 12 assemblies/illumina/spades/Zymo-Isolates-SPAdes-Illumina.fasta.gz $fastq | samtools sort -@12 -m100G - -o results/$run.sorted.bam; samtools index results/$run.sorted.bam"
+
+#rule nl_bam_stats:
+#    shell: "samtools view -h results/$run.sorted.bam | python ../scripts/zymo/nickloman/bamstats.py - > results/$run.stats.txt"
+
+#rule nl_align_summary:
+#    conda: "environments/R.yaml"
+#    shell: "Rscript ../scripts/zymo/nickloman/summariseStats.R results/$run.stats.txt $metadata results/$run"
