@@ -1,0 +1,81 @@
+# Import config, set working dir, load manifest and define default rules:
+include: "Snakefile-base"
+
+GENOMES = [
+    "bacillus_subtilis",
+    "enterococcus_faecalis",
+    "escherichia_coli",
+    "listeria_monocytogenes",
+    "pseudomonas_aeruginosa",
+    "saccharomyces_cerevisiae",
+    "salmonella_enterica",
+    "staphylococcus_aureus",
+]
+
+rule finish-zymo:
+    input:
+        base="reticulated.base.ok", # This will ensure the base rules have finished first
+        checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"))
+    output: touch("reticulated.zymo.ok")
+    shell: 'echo "Reticulated successfully."'
+
+rule presetup_checkm:
+    output: directory("checkm")
+    shell: "mkdir checkm; cd checkm; wget https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz; tar xvf checkm_data_2015_01_16.tar.gz"
+
+rule setup_checkm:
+    conda: "environments/checkm.yaml"
+    input: directory("checkm")
+    output: touch("checkm_setup.ok")
+    shell: "python --version; mkdir checkm; echo 'checkm/' | checkm data setRoot 'checkm/'"
+
+rule extract_kraken_contigs:
+    input:
+        assembly="{assembly}.fa",
+        k2="{assembly}.fa.k2",
+    params:
+        genomes=GENOMES,
+    output:
+        directory("extracted_contigs/{assembly}/")
+    shell:
+        "python ../scripts/extract_contigs_with_kraken.py {input.k2 {input.assembly} {output}; python ../scripts/ensure_genomes.py {output} {params.genomes}"
+
+def checkm_pick_taxon(w):
+    lookup = {
+        "bacillus_subtilis":        {"rank": "species", "genome": "Bacillus subtilis"},
+        "enterococcus_faecalis":    {"rank": "species", "genome": "Enterococcus faecalis"},
+        "escherichia_coli":         {"rank": "species", "genome": "Escherichia coli"},
+        "listeria_monocytogenes":   {"rank": "species", "genome": "Listeria monocytogenes"},
+        "pseudomonas_aeruginosa":   {"rank": "species", "genome": "Pseudomonas aeruginosa"},
+        #"saccharomyces_cerevisiae": {"rank": "species", "genome": ""},
+        "salmonella_enterica":      {"rank": "species", "genome": "Salmonella enterica"},
+        "staphylococcus_aureus":    {"rank": "species", "genome": "Staphylococcus aureus"},
+    }
+    try:
+        return lookup[w.genome]
+    except KeyError:
+        return {"rank": "life", "genome": "Prokaryote"}
+
+
+# This rule is a little annoying, we *should* be explicitly naming the input
+# FASTA needed for the checkM bin as extracted by our kraken script.
+# Unfortunately, as the extract_kraken_contigs rule output is defined as a dictionary
+# we cannot explicitly name an input inside that directory without a ChildIOException.
+# That rule has a python script that attempts to guarantee those files exist, so
+# as long as the directory exists, we can be reasonably confident the FASTA do too.
+#   As gross as it sounds, the requisite `cp` will fail if it *really* doesn't exist.
+# So this isn't a particularly unsafe workaround, just a gross one.
+rule checkm:
+    input:
+        ok="checkm_setup.ok",
+        d=directory("extracted_contigs/{assembly}/")
+        #fa="extracted_contigs/{assembly}/{genome}.fasta"
+    output:
+        working=directory("checkm-working/{assembly}/{genome}"),
+        bin=directory("checkm-bins/{assembly}/{genome}/"),
+    log: "checkm-results/{assembly}/{genome}.tsv"
+    params: p=checkm_pick_taxon
+    conda: "environments/checkm.yaml"
+    threads: 8
+    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {log}"
+rule checkm:
