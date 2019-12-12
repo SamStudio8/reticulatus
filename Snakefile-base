@@ -14,15 +14,16 @@ configfile: "config.yaml"
 # The rationale is you can git clone the pipeline and run it without doing any juggling.
 # Note that most things need to be prefixed with ../ to refer to the current directory,
 # but there are exceptions like when reading cfg files and conda environments.
-workdir: "working/"
+WORKDIR = os.path.abspath("working/")
+workdir: WORKDIR
 
 onstart:
-    rprefix = "set -euo pipefail; touch flags/{jobid}.start; "
+    rprefix = "set -euo pipefail; touch %s; " % os.path.join(WORKDIR, "flags", "{jobid}.start")
     if workflow.global_resources.get('benchmark', False):
         rprefix += "python3 ../scripts/drop_cache_client.py; "
 
     shell.prefix(rprefix)
-    shell.suffix("; touch flags/{jobid}.finish;")
+    shell.suffix("; touch %s;" % os.path.join(WORKDIR, "flags", "{jobid}.finish"))
 
     import snakemake.benchmark
     import benchmark as rbenchmark
@@ -65,7 +66,7 @@ onstart:
             tree_sjob(job, ptr, depth+1)
 
     finish = next(workflow.persistence.dag.jobs)
-    if finish.name != "finish":
+    if not finish.name.startswith("finish"):
         print("Not like this."); sys.exit(80);
 
     for sample in job_bins:
@@ -197,6 +198,8 @@ rule finish:
         kraken="kraken_summary.bond.tsv",
         base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg"),
         polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
+    output: touch("reticulated.base.ok")
+    shell: 'echo "Reticulated successfully."'
 
 rule merge_reads:
     input: lambda w: get_reads(w, w.readtype, samplename=os.path.basename(w.samplename))
