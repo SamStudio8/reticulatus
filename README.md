@@ -81,8 +81,8 @@ For each pipe you want to run, add a tab delimited line with the following field
 | `polishpipe` | str | a minilanguage that determines the polishing strategy. strategies are of the format `<program>-<readtype>-<iterations>` and are chained with the `.` character. *e.g.* `racon-ont-4.medaka-ont-1.pilon-ill-1` will perform four rounds of iterative `racon` long-read polishing, followed by one round of medaka long-read polishing and finally one round of `pilon` short-read polishing. Currently the following polishers are supported: racon, medaka, pilon and dehumanizer. No polishing can be acheived by setting to `-`. |
 | `medakamodel` | str | the option to pass to `medaka_consensus -m`, this corresponds to the model to use for medaka long-read polishing, it will depend on your ONT basecaller version |
 |       |               | feel free to add your own columns for metadata here, fill your boots, reticulatus doesn't care |
-| `cpu` | int, optional | override the number of available CPU cores to this limit |
-| `gpu` | int, optional | override the number of available GPU interfaces to this limit |
+| `cpu` | int, optional | override the number of available CPU cores to this limit. this is optional, but if you use the field and don't want to override a sample, you **must** specify `-` |
+| `gpu` | int, optional | override the number of available GPU interfaces to this limit. this is optional, but if you use the field and don't want to override a sample, you **must** specify `-` |
 
 
 ### (5) Engage the pipeline
