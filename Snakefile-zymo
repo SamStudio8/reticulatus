@@ -5,6 +5,7 @@ include: "Snakefile-base"
 
 references = pd.read_table("../ref.cfg").set_index("refname", drop=False)
 GENOMES = references["refname"]
+del GENOMES['default']
 
 rule finish_zymo:
     input:
