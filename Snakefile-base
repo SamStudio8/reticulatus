@@ -20,7 +20,7 @@ workdir: WORKDIR
 onstart:
     rprefix = "set -euo pipefail; touch %s; " % os.path.join(WORKDIR, "flags", "{jobid}.start")
     if workflow.global_resources.get('benchmark', False):
-        rprefix += "python3 ../scripts/drop_cache_client.py; "
+        rprefix += "python3 ../scripts/benchmarking/drop_cache_client.py; "
 
     shell.prefix(rprefix)
     shell.suffix("; touch %s;" % os.path.join(WORKDIR, "flags", "{jobid}.finish"))
