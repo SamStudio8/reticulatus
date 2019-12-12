@@ -1,0 +1,10 @@
+refname	ref	rank	taxon
+default	-	life	Prokaryote
+bacillus_subtilis	-	species	Bacillus subtilis
+enterococcus_faecalis	-	species	Enterococcus faecalis
+escherichia_coli	-	species	Escherichia coli
+listeria_monocytogenes	-	species	Listeria monocytogenes
+salmonella_enterica	-	species	Salmonella enterica
+staphylococcus_aureus	-	species	Staphylococcus aureus
+saccharomyces_cerevisiae	-	life	Prokaryote
+pseudomonas_aeruginosa	-	species	Pseudomonas aeruginosa

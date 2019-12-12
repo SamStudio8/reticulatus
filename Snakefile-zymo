@@ -1,16 +1,10 @@
+import pandas as pd
+
 # Import config, set working dir, load manifest and define default rules:
 include: "Snakefile-base"
 
-GENOMES = [
-    "bacillus_subtilis",
-    "enterococcus_faecalis",
-    "escherichia_coli",
-    "listeria_monocytogenes",
-    "pseudomonas_aeruginosa",
-    "saccharomyces_cerevisiae",
-    "salmonella_enterica",
-    "staphylococcus_aureus",
-]
+references = pd.read_table("../ref.cfg").set_index("refname", drop=False)
+GENOMES = references["refname"]
 
 rule finish_zymo:
     input:
@@ -41,21 +35,11 @@ rule extract_kraken_contigs:
         "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/ensure_genomes.py {output} {params.genomes}"
 
 def checkm_pick_taxon(w):
-    lookup = {
-        "bacillus_subtilis":        {"rank": "species", "genome": "Bacillus subtilis"},
-        "enterococcus_faecalis":    {"rank": "species", "genome": "Enterococcus faecalis"},
-        "escherichia_coli":         {"rank": "species", "genome": "Escherichia coli"},
-        "listeria_monocytogenes":   {"rank": "species", "genome": "Listeria monocytogenes"},
-        "pseudomonas_aeruginosa":   {"rank": "species", "genome": "Pseudomonas aeruginosa"},
-        #"saccharomyces_cerevisiae": {"rank": "species", "genome": ""},
-        "salmonella_enterica":      {"rank": "species", "genome": "Salmonella enterica"},
-        "staphylococcus_aureus":    {"rank": "species", "genome": "Staphylococcus aureus"},
+    refname =  references["refname"].get(w.genome, 'default')
+    return {
+        "rank": references.loc[refname]["rank"],
+        "genome": references.loc[refname]["taxon"]
     }
-    try:
-        return lookup[w.genome]
-    except KeyError:
-        return {"rank": "life", "genome": "Prokaryote"}
-
 
 # This rule is a little annoying, we *should* be explicitly naming the input
 # FASTA needed for the checkM bin as extracted by our kraken script.
