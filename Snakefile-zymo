@@ -33,7 +33,7 @@ rule extract_kraken_contigs:
     output:
         directory("extracted_contigs/{assembly}/")
     shell:
-        "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/ensure_genomes.py {output} {params.genomes}"
+        "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/zymo/ensure_genomes.py {output} {params.genomes}"
 
 def checkm_pick_taxon(w):
     refname =  references["refname"].get(w.genome, 'default')
