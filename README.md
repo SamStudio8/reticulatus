@@ -8,14 +8,12 @@ A long snake for a long assemblies
 ```
 conda env create --name reticulatus --file environments/base.yaml
 conda activate reticulatus
-```
-
-Initalise which pipeline you want. It will almost always be `Snakefile-base` for the time being. Run `Snakefile-full`to replicate our mock community pipeline.
-
-```
 cp Snakefile-base Snakefile
 ```
-**Note** It's now quite important that you ensure you install the `snakemake-minimal` package using the environment specified above. Not only is this easier, but it ensures that the version installed is suitable for the overriden `shell.py` that now ships with `reticulatus`.
+
+You will almost certaintly want the `Snakefile-base` rule set for the time being. Run `Snakefile-zymo`to replicate our [mock community benchmarking pipeline](https://github.com/LomanLab/mockcommunity).
+
+**Note** It is important that you ensure `snakemake-minimal` package is installed automatically using the environment specified above. Not only is this easier, but makes sure that the version installed is suitable for the overriden `shell.py` that ships with `reticulatus`.
 
 ### (2) Write your configuation
 
@@ -82,6 +80,9 @@ For each pipe you want to run, add a tab delimited line with the following field
 | `spell` | str | the "spell" to configure your assembly and polishing, corresponding to a named configuration in `spellbook.py` |
 | `polishpipe` | str | a minilanguage that determines the polishing strategy. strategies are of the format `<program>-<readtype>-<iterations>` and are chained with the `.` character. *e.g.* `racon-ont-4.medaka-ont-1.pilon-ill-1` will perform four rounds of iterative `racon` long-read polishing, followed by one round of medaka long-read polishing and finally one round of `pilon` short-read polishing. Currently the following polishers are supported: racon, medaka, pilon and dehumanizer. No polishing can be acheived by setting to `-`. |
 | `medakamodel` | str | the option to pass to `medaka_consensus -m`, this corresponds to the model to use for medaka long-read polishing, it will depend on your ONT basecaller version |
+|       |               | feel free to add your own columns for metadata here, fill your boots, reticulatus doesn't care |
+| `cpu` | int, optional | override the number of available CPU cores to this limit |
+| `gpu` | int, optional | override the number of available GPU interfaces to this limit |
 
 
 ### (5) Engage the pipeline
