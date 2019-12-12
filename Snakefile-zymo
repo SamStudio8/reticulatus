@@ -12,10 +12,10 @@ GENOMES = [
     "staphylococcus_aureus",
 ]
 
-rule finish-zymo:
+rule finish_zymo:
     input:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
-        checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"))
+        checkm=expand("checkm-results/{assembly}/{genome}.tsv", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"), genome=GENOMES)
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
 
@@ -27,18 +27,18 @@ rule setup_checkm:
     conda: "environments/checkm.yaml"
     input: directory("checkm")
     output: touch("checkm_setup.ok")
-    shell: "python --version; mkdir checkm; echo 'checkm/' | checkm data setRoot 'checkm/'"
+    shell: "echo 'checkm/' | checkm data setRoot 'checkm/'"
 
 rule extract_kraken_contigs:
     input:
-        assembly="{assembly}.fa",
-        k2="{assembly}.fa.k2",
+        assembly="{assembly}",
+        k2="{assembly}.k2",
     params:
         genomes=GENOMES,
     output:
         directory("extracted_contigs/{assembly}/")
     shell:
-        "python ../scripts/extract_contigs_with_kraken.py {input.k2 {input.assembly} {output}; python ../scripts/ensure_genomes.py {output} {params.genomes}"
+        "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/ensure_genomes.py {output} {params.genomes}"
 
 def checkm_pick_taxon(w):
     lookup = {
@@ -73,9 +73,8 @@ rule checkm:
     output:
         working=directory("checkm-working/{assembly}/{genome}"),
         bin=directory("checkm-bins/{assembly}/{genome}/"),
-    log: "checkm-results/{assembly}/{genome}.tsv"
+        res="checkm-results/{assembly}/{genome}.tsv"
     params: p=checkm_pick_taxon
     conda: "environments/checkm.yaml"
     threads: 8
-    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {log}"
-rule checkm:
+    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.res}"
