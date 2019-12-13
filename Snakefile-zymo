@@ -62,7 +62,7 @@ rule checkm:
     params: p=checkm_pick_taxon
     conda: "environments/checkm.yaml"
     threads: 8
-    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -q -t {threads} -x fasta {params.p[rank]} '{params.p[genome]:q}' {output.bin} {output.working} > {output.res}"
+    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -q -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.res}"
 
 rule merge_checkm:
     input:
