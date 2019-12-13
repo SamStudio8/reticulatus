@@ -10,7 +10,7 @@ del GENOMES['default']
 rule finish_zymo:
     input:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
-        checkm=expand("checkm-results/{assembly}/{genome}.tsv", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"), genome=GENOMES)
+        checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"))
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
 
@@ -62,7 +62,15 @@ rule checkm:
     params: p=checkm_pick_taxon
     conda: "environments/checkm.yaml"
     threads: 8
-    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.res}"
+    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -q -t {threads} -x fasta {params.p[rank]} '{params.p[genome]:q}' {output.bin} {output.working} > {output.res}"
+
+rule merge_checkm:
+    input:
+        logs=expand("checkm-results/{{assembly}}/{genome}.tsv", genome=GENOMES)
+    output:
+        "checkm-{assembly}.txt"
+    shell:
+        "cat {input.logs} > {output}"
 
 
 #rule nl_align_ref:
