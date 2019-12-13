@@ -9,6 +9,7 @@ dependencies:
   - bcftools =1.9
   - samtools =1.9
   - pysam =0.15.0
+  - pyvcf
   - pandas
   - biopython
   - minimap2
