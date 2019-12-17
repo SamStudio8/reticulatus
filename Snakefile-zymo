@@ -80,13 +80,15 @@ def fastmer_get_ref(genome):
         refloc = "download/refs/%s.fa" % refname
     return refloc
 
-from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
-HTTP = HTTPRemoteProvider()
+#from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
+#HTTP = HTTPRemoteProvider()
 rule download_ref:
-    input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
+    #input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
+    params:
+        remote=lambda w: references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", "")
     output: "download/refs/{ref}"
     run:
-        shell("mv {input} {output}")
+        shell("wget {params.remote} -O {output}")
 
 rule jts_fastmer:
     input:
