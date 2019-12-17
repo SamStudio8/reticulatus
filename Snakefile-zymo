@@ -11,7 +11,7 @@ rule finish_zymo:
     input:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
         checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa")),
-        fastmer=expand("fastmer-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"))
+        fastmer="fastmer-result.txt",
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
 
@@ -30,7 +30,7 @@ rule extract_kraken_contigs:
         assembly="{assembly}",
         k2="{assembly}.k2",
     params:
-        genomes=GENOMES,
+        genomes=list(GENOMES),
     output:
         directory("extracted_contigs/{assembly}/")
     shell:
@@ -92,6 +92,14 @@ rule merge_fastmer:
         "fastmer-{assembly}.txt"
     shell:
         "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' > {output}"
+
+rule super_merge_fastmer:
+    input:
+        logs=expand("fastmer-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"))
+    output:
+        "fastmer-result.txt"
+    shell:
+        "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' | bond - ../manifest.cfg --greedy | bond - ../reads.cfg --dcol 18 > {output}"
 
 #rule nl_align_ref:
 #    shell: "minimap2 -a -x map-ont -t 12 assemblies/illumina/spades/Zymo-Isolates-SPAdes-Illumina.fasta.gz $fastq | samtools sort -@12 -m100G - -o results/$run.sorted.bam; samtools index results/$run.sorted.bam"
