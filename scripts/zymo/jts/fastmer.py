@@ -296,9 +296,13 @@ parser.add_argument('--max-hp-length', type=int, required=False, default=9)
 parser.add_argument('--print-alignment', action='store_true')
 parser.add_argument('--print-identity-per-segment', action='store_true')
 parser.add_argument('--write-edits', type=str, required=False)
+parser.add_argument('--temp-bam', type=str, required=False)
 args = parser.parse_args()
 
 out_bam = args.assembly + ".assembly_analysis.sorted.bam"
+if args.temp_bam:
+    out_bam = args.temp_bam
+
 with open(os.devnull, 'wb') as devnull:
     mm2_cmd = "minimap2 -Y -a -x asm5 %s %s | samtools sort -T %s.tmp -o %s -" % (args.reference, args.assembly, out_bam, out_bam)
     subprocess.check_call(mm2_cmd, stdout=devnull, stderr=devnull, shell=True)
@@ -371,5 +375,6 @@ else:
     print("\t".join([str(x) for x in stats]))
 
 # clean up temporary files
-os.remove(out_bam)
-os.remove(out_bam + ".bai")
+if not args.temp_bam:
+    os.remove(out_bam)
+    os.remove(out_bam + ".bai")

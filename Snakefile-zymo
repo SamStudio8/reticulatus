@@ -95,8 +95,10 @@ rule jts_fastmer:
         reference=lambda w: fastmer_get_ref(w.genome),
         assembly="{assembly}",
     output:
-        res="fastmer-results/{assembly}/{genome}.tsv"
-    shell: "python ../scripts/zymo/jts/fastmer.py --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 > {output.res}"
+        res="fastmer-results/{assembly}/{genome}.tsv",
+        bam=temp("{assembly}.{genome}.assembly_analysis.sorted.bam"),
+        bai=temp("{assembly}.{genome}.assembly_analysis.sorted.bam.bai"),
+    shell: "python ../scripts/zymo/jts/fastmer.py --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 > {output.res}"
 
 rule merge_fastmer:
     input:
