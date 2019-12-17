@@ -17,7 +17,8 @@ configfile: "config.yaml"
 WORKDIR = os.path.abspath("working/")
 workdir: WORKDIR
 
-onstart:
+
+def base_onstart():
     rprefix = "set -euo pipefail; touch %s; " % os.path.join(WORKDIR, "flags", "{jobid}.start")
     if workflow.global_resources.get('benchmark', False):
         rprefix += "python3 ../scripts/benchmarking/drop_cache_client.py; "
@@ -90,6 +91,10 @@ onstart:
         print(sample)
         print_sjob(sample_deps[sample], set([]), sample=sample)
     status_fh.close()
+
+ONSTART_QUEUE = [base_onstart]
+onstart:
+    [f() for f in ONSTART_QUEUE]
 
 onsuccess:
     # TODO Need to update https://github.com/slackapi/python-slackclient/wiki/Migrating-to-2.x

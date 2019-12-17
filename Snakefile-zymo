@@ -3,6 +3,12 @@ import pandas as pd
 # Import config, set working dir, load manifest and define default rules:
 include: "Snakefile-base"
 
+def zymo_onstart():
+    print("HOOT HOOT")
+    if workflow.global_resources.get("zymo", False):
+        print("ZYMO TIME")
+ONSTART_QUEUE.append(zymo_onstart)
+
 references = pd.read_table("../ref.cfg").set_index("refname", drop=False)
 GENOMES = references["refname"]
 del GENOMES['default']
