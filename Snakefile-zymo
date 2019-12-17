@@ -3,12 +3,6 @@ import pandas as pd
 # Import config, set working dir, load manifest and define default rules:
 include: "Snakefile-base"
 
-def zymo_onstart():
-    print("HOOT HOOT")
-    if workflow.global_resources.get("zymo", False):
-        print("ZYMO TIME")
-ONSTART_QUEUE.append(zymo_onstart)
-
 references = pd.read_table("../ref.cfg").set_index("refname", drop=False)
 GENOMES = references["refname"]
 del GENOMES['default']
@@ -81,7 +75,18 @@ rule merge_checkm:
 
 def fastmer_get_ref(genome):
     refname = references["refname"].get(genome, 'default')
-    return references.loc[refname]["ref"] if references.loc[refname]["ref"] != '-' else None
+    refloc = references.loc[refname]["ref"] if references.loc[refname]["ref"] != '-' else None
+    if refloc and refloc.startswith("HTTP"):
+        refloc = "download/refs/%s.fa" % refname
+    return refloc
+
+from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
+HTTP = HTTPRemoteProvider()
+rule download_ref:
+    input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
+    output: "download/refs/{ref}"
+    run:
+        shell("mv {input} {output}")
 
 rule jts_fastmer:
     input:
