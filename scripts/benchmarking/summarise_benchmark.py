@@ -20,7 +20,7 @@ search = {
 
     "Predict]": {
         'f': lambda x, struct: catch_window(x.strip().split()[0].replace('[',''), struct),
-        "f_post": lambda struct: (abs(struct["last"] - struct["first"]) + timedelta(days=struct["days"])).total_seconds(),
+        "f_post": lambda struct: post_window(struct),
     },
     "Sampler]": {
         'f': lambda x, struct: catch_window(x.strip().split()[0].replace('[',''), struct),
@@ -28,21 +28,26 @@ search = {
     },
     "Stitch]": {
         'f': lambda x, struct: catch_window(x.strip().split()[0].replace('[',''), struct),
-        "f_post": lambda struct: (abs(struct["last"] - struct["first"]) + timedelta(days=struct["days"])).total_seconds(),
+        "f_post": lambda struct: post_window(struct),
     },
 }
 
 defaults = {
     "Predict]": {
-        "first":None, "last":None, "days":0, "name":"predict"
+        "first":None, "last":None, "days":0, "name":"predict", "wrapped":False
     },
     "Stitch]": {
-        "first":None, "last":None, "days":0, "name":"stitch"
+        "first":None, "last":None, "days":0, "name":"stitch", "wrapped":False
     },
 }
 
 
 from datetime import datetime, timedelta
+def post_window(struct):
+    if struct["last"] < struct["first"]:
+        struct["last"] = struct["last"] + timedelta(days=1)
+    return (abs(struct["last"] - struct["first"]) + timedelta(days=struct["days"])).total_seconds()
+
 def catch_window(x, struct):
     x = datetime.strptime(x, "%H:%M:%S")
     if not struct["first"]:
@@ -50,8 +55,12 @@ def catch_window(x, struct):
 
     if struct["last"]:
         if x < struct["last"]:
+            print("wrapped")
+            struct["wrapped"] = True
+        elif x > struct["first"] and struct["wrapped"]:
             # Next day
             struct["days"] += 1
+            struct["wrapped"] = False
     struct["last"] = x
     return True
 
