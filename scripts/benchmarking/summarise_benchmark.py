@@ -55,7 +55,6 @@ def catch_window(x, struct):
 
     if struct["last"]:
         if x < struct["last"]:
-            print("wrapped")
             struct["wrapped"] = True
         elif x > struct["first"] and struct["wrapped"]:
             # Next day
