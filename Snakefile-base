@@ -19,6 +19,9 @@ workdir: WORKDIR
 
 
 def base_onstart():
+    #for a in enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"):
+    #    sys.stderr.write("*\t%s\n" % a)
+
     rprefix = "set -euo pipefail; touch %s; " % os.path.join(WORKDIR, "flags", "{jobid}.start")
     if workflow.global_resources.get('benchmark', False):
         rprefix += "python3 ../scripts/benchmarking/drop_cache_client.py; "
@@ -89,7 +92,7 @@ def base_onstart():
     
     for sample in sample_deps:
         print(sample)
-        print_sjob(sample_deps[sample], set([]), sample=sample)
+        #print_sjob(sample_deps[sample], set([]), sample=sample)
     status_fh.close()
 
 ONSTART_QUEUE = [base_onstart]
@@ -236,7 +239,7 @@ rule rmdup_reads:
 
 def input_polish(w, name):
     if int(w.iteration) > 1:
-        contigs = "%s.%s.ctg.cns.%s%s-%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, name, w.readtype, int(w.iteration)-1)
+        contigs = "%s.%s.ctg.cns.%s%s-%s%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, name, w.readtype, w.get("depth", ""), int(w.iteration)-1)
     elif w.polishedprefix=="":
         # Polish existing assembly if repolish is set
         polish_uuid = w.uuid
@@ -257,7 +260,7 @@ def input_polish_dehumanizer(w):
     return input_polish(w, "dehumanizer")
 
 def minimap2_mode(w):
-    if w.readtype == "ont":
+    if w.readtype.startswith("ont"):
         mode = "map-ont"
     elif w.readtype == "ill":
         mode = "sr"
@@ -275,7 +278,16 @@ def get_reads(w, readtype, samplename=None):
     return r
 
 def polish_reads_input(w):
-    if w.readtype == "ont":
+    if w.readtype == "ont" and not w.get("depth", None):
+        reads = get_reads(w, 'ont')
+    elif w.readtype == "ont" and w.get("depth", None):
+        reads = "%s.%s.ctg.cns.%sracon-%s%s-%s.reads.fa" % (w.uuid, w.conf, w.polishedprefix, w.readtype, w.depth, w.iteration)
+    elif w.readtype == "ill":
+        reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
+    return reads
+
+def align_polish_reads_input(w):
+    if w.readtype.startswith("ont"):
         reads = get_reads(w, 'ont')
     elif w.readtype == "ill":
         reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
@@ -305,22 +317,22 @@ def n_gpu(w, key=""):
     return n_gpu
 
 rule minimap2_racon_bam:
-    input: contigs=input_polish_racon, reads=polish_reads_input
+    input: contigs=input_polish_racon, reads=align_polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
     threads: lambda w: n_threads(w, "minimap2_threads")
     output:
-        b=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"),
-        bai=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam.bai"),
+        b=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"),
+        bai=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam.bai"),
     resources:
         benchmark=1,
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam"
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T {wildcards.uuid}-A -m 4G -@ {threads} -o {output.b}; samtools index {output.b}"
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.b} -m 4G -@ {threads} -o {output.b}; samtools index {output.b}"
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
 rule minimap2_racon_sam:
-    input: contigs=input_polish_racon, reads=polish_reads_input
+    input: contigs=input_polish_racon, reads=align_polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
@@ -328,21 +340,21 @@ rule minimap2_racon_sam:
     resources:
         benchmark=1,
     output:
-        s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"),
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam"
+        s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"),
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output.s} 2> {log}"
 
 rule minimap2_racon_subsample:
-    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam",
-        bai="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bam.bai"
-    output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.sam"),
-        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fa",
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.sam"
+    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam",
+        bai="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam.bai"
+    output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"),
+        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.reads.fa",
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
     threads: lambda w: n_threads(w, "minimap2_threads")
     resources:
         benchmark=1,
-    shell: "subsample_bam {input.b} 250 -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B -m 4G -O SAM -o {output.s} -@ {threads}"
+    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B -m 4G -O SAM -o {output.s} -@ {threads}"
 
 #rule minimap2_racon_subsample_fq:
 #    input:
@@ -353,17 +365,16 @@ rule minimap2_racon_subsample:
 #    threads: lambda w: n_threads(w, "minimap2_threads")
 #    shell: "zcat {input.reads} | seqkit grep -f {input.fql} | pigz > {output}"
 
-
 rule polish_racon:
-    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.sam", #reads2="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa.bp.fa",
+    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa.sam"
     params:
         cuda=lambda w: "--cudapoa-batches %d" % config["racon_batches"] if n_gpu(w, "polish_gpu") > 0 else "",
         devices=select_gpu_device,
     output:
-        out="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa",
-        rtbench="rtbenchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa",
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}-{iteration,\d+}.fa"
+        out="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
+        rtbench="rtbenchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
     threads: lambda w: n_threads(w, "polish_threads")
     resources:
         gpu=lambda w: n_gpu(w, "polish_gpu"),
