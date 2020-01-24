@@ -400,7 +400,7 @@ rule polish_medaka:
         gpu=lambda w: n_gpu(w, "polish_gpu"),
         benchmark=1,
     shell:
-        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; rm -f {params.mmi}; medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch} > {log} 2>&1; mv medaka-{params.prefix}/consensus.fasta {output}"
+        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf medaka-{params.prefix}/*; rm -f {params.mmi}; SORT='-m 4G' medaka_consensus -i {input.reads} -d {input.contigs} -o medaka-{params.prefix} -t {threads} -m {params.model} {params.batch} > {log} 2>&1; mv medaka-{params.prefix}/consensus.fasta {output}"
 
 rule download_dehumanizer_database:
     output:
