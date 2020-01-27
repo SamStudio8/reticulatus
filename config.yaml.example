@@ -20,3 +20,5 @@ assembly_threads:
      8
 minimap2_threads:
      8
+sort_flags:
+     "-m 4G"
