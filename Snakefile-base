@@ -393,7 +393,9 @@ rule polish_medaka:
         mmi=lambda w, input: temp("%s.mmi" % input.contigs)
     output:
         fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa",
-        chdf=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/consensus_probs.hdf")
+        chdf=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/consensus_probs.hdf"),
+        cbam=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/calls_to_draft.bam"),
+        cbai=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/calls_to_draft.bam.bai")
     threads: lambda w: n_threads(w, "polish_threads")
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
