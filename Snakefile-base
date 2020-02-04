@@ -328,7 +328,8 @@ rule minimap2_racon_bam:
     resources:
         benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.b} -m 4G -@ {threads} -o {output.b}; samtools index {output.b}"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.b} -m 4G -@ {threads} -o {output.b}; samtools index {output.b} 2> {log}"
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
 rule minimap2_racon_sam:
@@ -351,10 +352,11 @@ rule minimap2_racon_subsample:
     output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"),
         fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.reads.fa",
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
     threads: lambda w: n_threads(w, "minimap2_threads")
     resources:
         benchmark=1,
-    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B -m 4G -O SAM -o {output.s} -@ {threads}"
+    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B -m 4G -O SAM -o {output.s} -@ {threads} 2> {log}"
 
 #rule minimap2_racon_subsample_fq:
 #    input:
