@@ -9,7 +9,7 @@ slack_channel:
 cuda:
     False
 medaka_env:
-    "library://samstudio8/default/cuda9-cudnn7-ubuntu1604-prom:sha256.3aaf99eb6e0e53a667b221bb7209616b1d5a614f0bee7b5e5767ada505c58719"
+    "library://samstudio8/default/cuda9-cudnn7-ubuntu1604-prom:sha256.14a07fc2a8001ddb98e681cf49e72e408b0e343c6f886795382dd0f11ca23417"
 racon_batches:
      16
 polish_threads:
