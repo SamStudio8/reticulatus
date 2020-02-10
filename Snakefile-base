@@ -462,6 +462,14 @@ rule summarise_assembly_meta:
     shell:
         "for fa in {input}; do base=`basename $fa`; md5=`md5sum $fa | cut -f1 -d' '`; size=`du -Lh $fa | cut -f1`; echo \"$base,$size,$md5\"; done > {output}"
 
+rule assembly_read_coverage:
+    input:
+        b="{uuid}.{prefix}.fa.bam",
+        bai="{uuid}.{prefix}.fa.bam.bai",
+    output:
+        depth="{uuid}.{prefix}.fa.depth"
+    shell: "echo -e \"contig\tcov_min\tcov_max\tcov_median\tcov_iqr\tcov_mean\tcov_pstdev\" > {output.depth}; samtools depth -a {input.b} | datamash -g 1 min 3 max 3 median 3 iqr 3 mean 3 pstdev 3 >> {output.depth}"
+
 rule bond_summarise_kraken:
     input:
         "kraken_summary.tsv"
@@ -472,11 +480,11 @@ rule bond_summarise_kraken:
 
 rule summarise_kraken:
     input:
-        enumerate_assemblies(suffix=".fa.k2")
+        enumerate_assemblies(suffix=".fa.k2k")
     output:
         "kraken_summary.tsv"
     shell:
-        "python ../scripts/extracken2.py {input} > {output}"
+        "awk 'FNR>1 || NR==1' {input} > {output}"
 
 rule download_kraken_database:
     output:
@@ -498,6 +506,17 @@ rule kraken:
     benchmark: "benchmarks/{uuid,[A-z0-9_-]*}.{prefix}.fa.k2"
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
+
+rule ktkit:
+    input:
+        k2o="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
+        depth="{uuid}.{prefix}.fa.depth",
+    params:
+        only=lambda w: "--only " + ",".join([g["ncbi_tid"] for g in GENOMES]) if "GENOMES" in globals() else ""
+    output:
+        k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2k"
+    threads: 1
+    shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,ktid,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} > {output}"
 
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
