@@ -17,6 +17,7 @@ dependencies:
   - seqtk
   - kraken2
   - seqkit
+  - datamash
   - pip:
     - git+https://github.com/SamStudio8/bondage.git
     - git+https://github.com/SamStudio8/dehumanizer.git
