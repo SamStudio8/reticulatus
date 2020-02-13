@@ -146,8 +146,8 @@ snakemake -j <available_threads> --reason --use-conda --use-singularity --singul
 
 Using the GPU will accelerate the following steps:
 
-* `polish_racon`: you will need a racon binary compiled with `CUDA`, for your system
-* `polish_medaka`: you will need to specify an appropriate singularity container, or install medaka with GPU support yourself
+* `polish_racon`: you will need a racon binary compiled with `CUDA`, for your system and have it appear on your `$PATH` before any other installed versions of `racon`
+* `polish_medaka`: you will need to specify an appropriate singularity container in `config.yaml`, or install medaka with GPU support yourself
 
 
 ## Housekeeping
