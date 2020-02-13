@@ -1,5 +1,28 @@
 # reticulatus
-A long snake for a long assemblies
+**A snakemake-based pipeline for assembling and polishing long nanopore reads**
+
+Reticulatus was developed in part to manage the execution of [long-read mock community experiments](https://lomanlab.github.io/mockcommunity/) at the Loman Lab.
+It turns out that it's quite good, so I've generalised it for any long-read nanopore experiments, so you too can enjoy highly-contiguous, blisteringly fast, cutting-edge assembly and polishing too.
+Reticulatus was designed for [assembly of metagenomic data](https://academic.oup.com/gigascience/article/8/5/giz043/5486468), but we have tried it on the [odd isolate too](https://twitter.com/samstudio8/status/1169293404943081473).
+
+Reticulatus **is not** an assembler or polisher, but a [well stacked set of bioinformatics blocks](https://twitter.com/sienkieee/status/1192876481942294530). Reticulatus tries to codify what we at the Loman Lab think is the current best-practice for nanopore bioinformatics into a (hopefully) easy-to-use pipeline, taking advantage of all the goodness of Snakemake while adding a few features; including:
+
+* a text-based read config that allows automated simple read pre-processing (deduplication, subsampling, merging)
+* a text-based run config that provides a trivial way to define assembly and polishing strategies
+* automatic generation of assembly bandage-art
+* very fast GPU-accelerated polishing (racon, medaka)
+* automated reporting of coverage and identity for contigs, for a set of references
+
+As an attempted embodiment of best practice, Reticulatus is under development all of the time. Feel free to open an issue if it looks broken or send a pull request if it could work better.
+
+Just so you know, the development of Reticulatus has:
+
+* [helped make `racon` even faster](https://github.com/clara-genomics/racon-gpu/issues/3)
+* [demonstrated GPU accelerated tools can work on ONT hardware](https://github.com/clara-genomics/racon-gpu/issues/2) and made [the containers to do so, freely available](https://github.com/SamStudio8/reticulatus-containers/)
+* [led to a port of `minidot` that works with `minimap2`](https://github.com/SamStudio8/minidot)
+* led to a more efficient implementation of BAM-based read subsampling in pomoxis
+* pushed some minor fixes to Snakemake
+
 
 ## How to drive this thing
 
