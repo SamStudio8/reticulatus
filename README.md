@@ -54,10 +54,10 @@ Replace the YAML keys as appropriate. Keys are:
 
 | Key | Type | Description | 
 |-----|------|-------------|
-| `dehumanizer_database_root` | Path | empty directory in which to download the dehumanizer references (requires ~8.5GB), you can ignore this if you're not going to remove contigs assigned as human by `kraken2` |
+| `dehumanizer_database_root` | Path, optional | empty directory in which to download the dehumanizer references (requires ~8.5GB), you can ignore this if you're not going to remove contigs assigned as human by `kraken2` |
 | `kraken2_database_root` | Path | path to pre-built kraken2 database (*i.e.* the directory containing the `.k2d` files), or the path to a directory in which to `wget` a copy of our 30GB [microbial database](https://lomanlab.github.io/mockcommunity/mc_databases.html). **If the database already exists, you must** `touch k2db.ok` in this directory or **bad things** will happen |
-| `slack_token` | str | if you want to be bombarded with slack messages regarding the success and failure of your snakes, insert a suitable bot API token here |
-| `slack_channel` | str | if using a `slack_token`, enter the name of the channel to send messages, including the leading `#` |
+| `slack_token` | str, optional | if you want to be bombarded with slack messages regarding the success and failure of your snakes, insert a suitable bot API token here |
+| `slack_channel` | str, optional | if using a `slack_token`, enter the name of the channel to send messages, including the leading `#` |
 | `cuda` | boolean | set to `False` if you do not want GPU-acceleration and `True` if you have the means to go very fast (*i.e.* you have a CUDA-compatible GPU) |
 | `medaka_env` | URI | path to a singularity image (simg) or sandbox container to run medaka (GPU) |
 
@@ -73,9 +73,9 @@ For each sample you have, add a tab delimited line with the following fields:
 |-----|------|-------------|
 | `sample_name` | str | a unique string that can be used to refer to this sample/readset later |
 | `ont` | Path* | path to your long reads |
-| `i0` | Path* | path to your single-pair short reads for this sample, otherwise you can just set to `-` |
-| `i1` | Path* | path to your left paired-end short reads |
-| `i2` | Path* | path to your right paired-end short reads |
+| `i0` | Path*, optional | path to your single-pair short reads for this sample, otherwise you can just set to `-` |
+| `i1` | Path*, optional | path to your left paired-end short reads |
+| `i2` | Path*, optional | path to your right paired-end short reads |
 | `*` | - | an arbitrary delimiter that has no purpose |
 ||| feel free to add your own columns for metadata here, fill your boots, reticulatus doesn't care |
 
