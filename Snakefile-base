@@ -316,6 +316,7 @@ def n_gpu(w, key=""):
         n_gpu = config[key]
     return n_gpu
 
+
 rule minimap2_racon_bam:
     input: contigs=input_polish_racon, reads=align_polish_reads_input
     params:
@@ -368,6 +369,7 @@ rule minimap2_racon_subsample:
 #    shell: "zcat {input.reads} | seqkit grep -f {input.fql} | pigz > {output}"
 
 rule polish_racon:
+    #input: contigs=input_polish_racon, reads=polish_reads_input, overlaps=lambda w: input_polish_racon(w)+".sam"
     input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa.sam"
     params:
         cuda=lambda w: "--cudapoa-batches %d" % config["racon_batches"] if n_gpu(w, "polish_gpu") > 0 else "",
@@ -464,11 +466,16 @@ rule summarise_assembly_meta:
 
 rule assembly_read_coverage:
     input:
-        b="{uuid}.{prefix}.fa.bam",
-        bai="{uuid}.{prefix}.fa.bam.bai",
+        contigs="{uuid}.{prefix}.fa",
+        reads=lambda w: get_reads(w, 'ont'),
+        #b="{uuid}.{prefix}.fa.bam",
+        #bai="{uuid}.{prefix}.fa.bam.bai",
     output:
-        depth="{uuid}.{prefix}.fa.depth"
-    shell: "echo -e \"contig\tcov_min\tcov_max\tcov_median\tcov_iqr\tcov_mean\tcov_pstdev\" > {output.depth}; samtools depth -a {input.b} | datamash -g 1 min 3 max 3 median 3 iqr 3 mean 3 pstdev 3 >> {output.depth}"
+        depth="{uuid,[A-z0-9_-]*}.{prefix}.fa.depth"
+    params:
+        mode="map-ont",
+    threads: lambda w: n_threads(w, "minimap2_threads")
+    shell: "echo -e \"contig\tcov_min\tcov_max\tcov_median\tcov_iqr\tcov_mean\tcov_pstdev\" > {output.depth}; minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.depth} %s -@ {threads} | samtools depth -a - | datamash -g 1 min 3 max 3 median 3 iqr 3 mean 3 pstdev 3 >> {output.depth}" % config["sort_flags"]
 
 rule bond_summarise_kraken:
     input:
@@ -509,10 +516,10 @@ rule kraken:
 
 rule ktkit:
     input:
-        k2o="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
+        k2o="{uuid}.{prefix}.fa.k2",
         depth="{uuid}.{prefix}.fa.depth",
     params:
-        only=lambda w: "--only " + ",".join([g["ncbi_tid"] for g in GENOMES]) if "GENOMES" in globals() else ""
+        only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else ""
     output:
         k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2k"
     threads: 1
