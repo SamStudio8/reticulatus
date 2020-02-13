@@ -26,6 +26,12 @@ Just so you know, the development of Reticulatus has:
 
 ## How to drive this thing
 
+### (0) Clone the repository where you want the magic to happen
+
+```
+git clone https://github.com/SamStudio8/reticulatus.git; cd reticulatus;
+```
+
 ### (1) Setup the environment
 
 ```
