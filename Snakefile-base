@@ -483,7 +483,7 @@ rule bond_summarise_kraken:
     output:
         "kraken_summary.bond.tsv"
     shell:
-        "bond {input} ../manifest.cfg > {output}"
+        "bond {input} ../manifest.cfg --dcol 13 --dropid > {output}"
 
 rule summarise_kraken:
     input:
@@ -523,7 +523,7 @@ rule ktkit:
     output:
         k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2k"
     threads: 1
-    shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,ktid,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} > {output}"
+    shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,ktid,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} --dropid | cut -f 2- > {output}"
 
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
