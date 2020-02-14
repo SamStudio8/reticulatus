@@ -1,3 +1,4 @@
+from collections import namedtuple
 import pandas as pd
 from snakemake.utils import validate
 import sys
@@ -155,88 +156,6 @@ samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)  # defi
 reads_lookup = pd.read_table("../reads.cfg").set_index("samplename", drop=False)
 
 # Utility functions
-def unroll_assemblies(w, name, unroll=True):
-    if not unroll:
-        return [name]
-
-    polishes = name.split(".")
-    if len(polishes) == 0 or len(polishes[0]) == 0:
-        return []
-
-    end_polish = polishes[-1]
-    end_polish_f = end_polish.split("-")
-    end_iter = int(end_polish_f[-1])
-    if (end_iter - 1) < 1:
-        return [name] + unroll_assemblies(w, ".".join(polishes[:-1]))
-    else:
-        end_polish_f[-1] = str(end_iter-1)
-        return [name] + unroll_assemblies(w, ".".join(polishes[:-1] + ["-".join(end_polish_f)]))
-
-def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=False):
-    base_assemblies = []
-    polished_assemblies = []
-    for uuid in samples["uuid"]:
-        conf = samples.loc[uuid]["spell"]
-        if samples.loc[uuid]["repolish"] == '-':
-            base_assemblies.append( "%s%s.%s.ctg.cns%s" % (prefix, uuid, conf, suffix) )
-
-        if samples.loc[uuid]["polishpipe"] != '-' and not base_only:
-            unrolled = unroll_assemblies(w, samples.loc[uuid]["polishpipe"], unroll=unroll)
-            context = ['%s%s.%s.ctg.cns.%s%s' % (prefix, uuid, conf, step, suffix) for step in unrolled]
-            polished_assemblies.extend(context)
-    return base_assemblies + polished_assemblies
-
-# TODO samstudio8
-# This function is fired during construction of the DAG when searching the parameter space of the GPU jobs,
-# it might be worth trying to catch the fact that execution hasn't started yet to suppress this output?
-def select_gpu_device(wildcards, resources):
-    if not config["cuda"] or resources.gpu == 0:
-        return None
-    import GPUtil
-    available = ",".join([str(x) for x in GPUtil.getAvailable(order = 'random', limit = resources.gpu, maxLoad = 0.5, maxMemory = 0.5, includeNan=False, excludeID=[], excludeUUID=[])])
-    print("Assigning %d available GPU devices: %s" % (resources.gpu, available))
-    return available
-
-
-rule finish:
-    input:
-        tests=enumerate_assemblies(base_only=True, unroll=False, prefix="tests/", suffix=".test.txt"),
-        stat="assembly_stats.txt",
-        meta="assembly_md5size.txt",
-        kraken="kraken_summary.bond.tsv",
-        base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg"),
-        polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
-    output: touch("reticulated.base.ok")
-    shell: 'echo "Reticulated successfully."'
-
-rule merge_reads:
-    input: lambda w: get_reads(w, w.readtype, samplename=os.path.basename(w.samplename))
-    output:
-        "{samplename}.cat-{readtype,\w+}.{ext,(fq|fastq)(\.gz|)}"
-    shell:
-        "cat {input} > {output}"
-    
-
-# new and improved version of this rule doesn't fucking nuke your input reads
-rule subset_reads:
-    input:
-        "{fq}.{ext}"
-    output:
-        "{fq}.subset-{ratio,\d+}.{ext,(fq|fastq)(\.gz|)}"
-    params:
-        ratio=lambda w: float(w.ratio)/100
-    shell:
-        "seqkit sample {input} -p {params.ratio} -o {output}"
-
-rule rmdup_reads:
-    input:
-        "{fq}.{ext}"
-    output:
-        out="{fq}.rmdup.{ext,(fq|fastq)(\.gz|)}",
-        dup="{fq}.dup.{ext,(fq|fastq)(\.gz|)}",
-    shell:
-        "seqkit rmdup -n -i {input} -o {output.out} -d {output.dup}"
-
 def input_polish(w, name):
     if int(w.iteration) > 1:
         contigs = "%s.%s.ctg.cns.%s%s-%s%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, name, w.readtype, w.get("depth", ""), int(w.iteration)-1)
@@ -315,6 +234,102 @@ def n_gpu(w, key=""):
     elif key in config:
         n_gpu = config[key]
     return n_gpu
+
+def unroll_assemblies(w, name, unroll=True):
+    if not unroll:
+        return [name]
+
+    polishes = name.split(".")
+    if len(polishes) == 0 or len(polishes[0]) == 0:
+        return []
+
+    end_polish = polishes[-1]
+    end_polish_f = end_polish.split("-")
+    end_iter = int(end_polish_f[-1])
+    if (end_iter - 1) < 1:
+        return [name] + unroll_assemblies(w, ".".join(polishes[:-1]))
+    else:
+        end_polish_f[-1] = str(end_iter-1)
+        return [name] + unroll_assemblies(w, ".".join(polishes[:-1] + ["-".join(end_polish_f)]))
+
+def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=False):
+    base_assemblies = []
+    polished_assemblies = []
+    for uuid in samples["uuid"]:
+        conf = samples.loc[uuid]["spell"]
+        if samples.loc[uuid]["repolish"] == '-':
+            base_assemblies.append( "%s%s.%s.ctg.cns%s" % (prefix, uuid, conf, suffix) )
+
+        if samples.loc[uuid]["polishpipe"] != '-' and not base_only:
+            unrolled = unroll_assemblies(w, samples.loc[uuid]["polishpipe"], unroll=unroll)
+            context = ['%s%s.%s.ctg.cns.%s%s' % (prefix, uuid, conf, step, suffix) for step in unrolled]
+            polished_assemblies.extend(context)
+    return base_assemblies + polished_assemblies
+
+def enumerate_reads(cols=["ont", "i1", "i2"], suffix=""):
+    read_paths = set([])
+    FakeWildcard = namedtuple('Wildcard', 'uuid')
+
+    for uuid in samples["uuid"]:
+        fw = FakeWildcard(uuid=uuid)
+        for col in cols:
+            path = get_reads(fw, col)
+            if path and path != '-':
+                read_paths.add(path + suffix)
+    return read_paths
+
+
+# TODO samstudio8
+# This function is fired during construction of the DAG when searching the parameter space of the GPU jobs,
+# it might be worth trying to catch the fact that execution hasn't started yet to suppress this output?
+def select_gpu_device(wildcards, resources):
+    if not config["cuda"] or resources.gpu == 0:
+        return None
+    import GPUtil
+    available = ",".join([str(x) for x in GPUtil.getAvailable(order = 'random', limit = resources.gpu, maxLoad = 0.5, maxMemory = 0.5, includeNan=False, excludeID=[], excludeUUID=[])])
+    print("Assigning %d available GPU devices: %s" % (resources.gpu, available))
+    return available
+
+
+rule finish:
+    input:
+        tests=enumerate_assemblies(base_only=True, unroll=False, prefix="tests/", suffix=".test.txt"),
+        stat="assembly_stats.txt",
+        meta="assembly_md5size.txt",
+        kraken="kraken_summary.bond.tsv",
+        reads_kraken=enumerate_reads(suffix=".k2kc"),
+        base_graphs=enumerate_assemblies(unroll=False, base_only=True, suffix=".gfa.svg"),
+        polished=enumerate_assemblies(base_only=False, unroll=False, suffix=".fa"),
+    output: touch("reticulated.base.ok")
+    shell: 'echo "Reticulated successfully."'
+
+rule merge_reads:
+    input: lambda w: get_reads(w, w.readtype, samplename=os.path.basename(w.samplename))
+    output:
+        "{samplename}.cat-{readtype,\w+}.{ext,(fq|fastq)(\.gz|)}"
+    shell:
+        "cat {input} > {output}"
+    
+
+# new and improved version of this rule doesn't fucking nuke your input reads
+rule subset_reads:
+    input:
+        "{fq}.{ext}"
+    output:
+        "{fq}.subset-{ratio,\d+}.{ext,(fq|fastq)(\.gz|)}"
+    params:
+        ratio=lambda w: float(w.ratio)/100
+    shell:
+        "seqkit sample {input} -p {params.ratio} -o {output}"
+
+rule rmdup_reads:
+    input:
+        "{fq}.{ext}"
+    output:
+        out="{fq}.rmdup.{ext,(fq|fastq)(\.gz|)}",
+        dup="{fq}.dup.{ext,(fq|fastq)(\.gz|)}",
+    shell:
+        "seqkit rmdup -n -i {input} -o {output.out} -d {output.dup}"
 
 
 rule minimap2_racon_bam:
@@ -487,7 +502,7 @@ rule bond_summarise_kraken:
 
 rule summarise_kraken:
     input:
-        enumerate_assemblies(suffix=".fa.k2k")
+        enumerate_assemblies(suffix=".fa.k2kc")
     output:
         "kraken_summary.tsv"
     shell:
@@ -503,27 +518,40 @@ rule download_kraken_database:
 
 rule kraken:
     input:
-        fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
+        #fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
+        fa="{path}", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
     output:
-        out="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
-        rep="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2r",
+        #out="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
+        #rep="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2r",
+        out="{path}.k2",
+        rep="{path}.k2r",
     threads: 8
     resources:
         benchmark=1, # Don't let this RAM pig near our assembly and polishing benchmarks
-    benchmark: "benchmarks/{uuid,[A-z0-9_-]*}.{prefix}.fa.k2"
+    #benchmark: "benchmarks/{uuid,[A-z0-9_-]*}.{prefix}.fa.k2"
+    benchmark: "benchmarks/{path}.k2"
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
 
-rule ktkit:
+rule ktkit_rollup:
     input:
         k2o="{uuid}.{prefix}.fa.k2",
         depth="{uuid}.{prefix}.fa.depth",
     params:
-        only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else ""
+        only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else "",
+        #uuid=lambda w, input: input.k2o.split(".")[0],
     output:
-        k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2k"
+        k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2kr"
     threads: 1
     shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,ktid,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} --dropid | cut -f 2- > {output}"
+
+rule ktkit_count:
+    input:
+        k2o="{path}.k2",
+    output:
+        k2k="{path}.k2kc"
+    threads: 1
+    shell: "echo -e 'ktkit_tid\tktkit_name\tmean_seq_len\tn_seq\tprop_seq\tn_seq_unmasked\ttot_bp\tprop_bp\tprop_bp_unmasked' > {output}; ktkit count {input.k2o} --rank species >> {output}"
 
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
