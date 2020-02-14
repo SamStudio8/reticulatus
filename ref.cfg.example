@@ -1,10 +1,10 @@
 refname	ref	rank	taxon	ncbi_tid
 default	-	life	Prokaryote	0
-bacillus_subtilis	-	species	Bacillus subtilis	1423
-enterococcus_faecalis	-	species	Enterococcus faecalis	1351
-escherichia_coli	-	species	Escherichia coli	562
-listeria_monocytogenes	-	species	Listeria monocytogenes	1639
-salmonella_enterica	-	species	Salmonella enterica	28901
-staphylococcus_aureus	-	species	Staphylococcus aureus	1280
-saccharomyces_cerevisiae	-	life	Prokaryote	4932
-pseudomonas_aeruginosa	-	species	Pseudomonas aeruginosa	287
+bacillus_subtilis	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/bacillus_subtilis_pb.fasta	species	Bacillus subtilis	1423
+enterococcus_faecalis	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/enterococcus_faecalis_pb.fasta	species	Enterococcus faecalis	1351
+escherichia_coli	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/escherichia_coli_pb.fasta	species	Escherichia coli	562
+listeria_monocytogenes	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/listeria_monocytogenes_pb.fasta	species	Listeria monocytogenes	1639
+salmonella_enterica	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/salmonella_enterica_pb.fasta	species	Salmonella enterica	28901
+staphylococcus_aureus	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/staphylococcus_aureus_pb.fasta	species	Staphylococcus aureus	1280
+saccharomyces_cerevisiae	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/saccharomyces_cerevisiae_pb.fasta	life	Prokaryote	4932
+pseudomonas_aeruginosa	HTTP:raw.githubusercontent.com/LomanLab/mockcommunity/master/analysis/snakemake-assembly/mason_refs/pseudomonas_aeruginosa_pb.fasta	species	Pseudomonas aeruginosa	287
