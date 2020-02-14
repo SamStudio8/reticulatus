@@ -9,6 +9,7 @@ flye_default.update({
     "m": '-',
     "hash": "eb89c9ef000f6dbcea426dcb430db92290546196",
     "plasmids": False,
+    "meta": True,
 })
 
 wtdbg2_default = deepcopy(master_default)
