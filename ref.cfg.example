@@ -1,10 +1,10 @@
-refname	ref	rank	taxon
-default	-	life	Prokaryote
-bacillus_subtilis	-	species	Bacillus subtilis
-enterococcus_faecalis	-	species	Enterococcus faecalis
-escherichia_coli	-	species	Escherichia coli
-listeria_monocytogenes	-	species	Listeria monocytogenes
-salmonella_enterica	-	species	Salmonella enterica
-staphylococcus_aureus	-	species	Staphylococcus aureus
-saccharomyces_cerevisiae	-	life	Prokaryote
-pseudomonas_aeruginosa	-	species	Pseudomonas aeruginosa
+refname	ref	rank	taxon	ncbi_tid
+default	-	life	Prokaryote	0
+bacillus_subtilis	-	species	Bacillus subtilis	1423
+enterococcus_faecalis	-	species	Enterococcus faecalis	1351
+escherichia_coli	-	species	Escherichia coli	562
+listeria_monocytogenes	-	species	Listeria monocytogenes	1639
+salmonella_enterica	-	species	Salmonella enterica	28901
+staphylococcus_aureus	-	species	Staphylococcus aureus	1280
+saccharomyces_cerevisiae	-	life	Prokaryote	4932
+pseudomonas_aeruginosa	-	species	Pseudomonas aeruginosa	287
