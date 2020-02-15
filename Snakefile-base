@@ -543,7 +543,7 @@ rule ktkit_rollup:
     output:
         k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2kr"
     threads: 1
-    shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,ktid,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} --dropid | cut -f 2- > {output}"
+    shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,contig_len,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} --dropid | cut -f 2- > {output}"
 
 rule ktkit_count:
     input:
