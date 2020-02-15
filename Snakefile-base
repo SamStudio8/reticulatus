@@ -502,7 +502,7 @@ rule bond_summarise_kraken:
 
 rule summarise_kraken:
     input:
-        enumerate_assemblies(suffix=".fa.k2kr")
+        enumerate_assemblies(suffix=".fa.k2kr", unroll=False)
     output:
         "kraken_summary.tsv"
     shell:
