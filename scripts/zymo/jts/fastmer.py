@@ -37,6 +37,8 @@ class AlignmentStats():
 
     def get_identity(self):
         alignment_length = self.matches + self.mismatches + self.insertions + self.deletions
+        if alignment_length == 0:
+            return 0
         return float(self.matches) / alignment_length
 
 class AssemblyAccuracy():
@@ -75,6 +77,8 @@ class AssemblyAccuracy():
         return self.global_stats.deletions
 
     def get_homopolymer_accuracy(self, length):
+        if self.global_stats.hp_count[length] == 0:
+            return 0
         return float(self.global_stats.hp_correct[length]) / self.global_stats.hp_count[length]
 
     def get_identity(self):
@@ -304,7 +308,7 @@ if args.temp_bam:
     out_bam = args.temp_bam
 
 with open(os.devnull, 'wb') as devnull:
-    mm2_cmd = "minimap2 -Y -a -x asm5 %s %s | samtools sort -T %s.tmp -o %s -" % (args.reference, args.assembly, out_bam, out_bam)
+    mm2_cmd = "minimap2 -Y -a -x asm5 %s %s --sam-hit-only | samtools sort -T %s.tmp -o %s -" % (args.reference, args.assembly, out_bam, out_bam)
     subprocess.check_call(mm2_cmd, stdout=devnull, stderr=devnull, shell=True)
 
     index_cmd = "samtools index %s" % (out_bam)
