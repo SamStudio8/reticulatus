@@ -26,10 +26,12 @@ rule map_reads:
     input:
         ref="super_ref.fa",
         reads="{path}"
+    params:
+        samplename=lambda w: reads_lookup.loc[reads_lookup['ont'] == w.path]["samplename"],
     output:
         "{path}.map.stat"
     threads: lambda w: n_threads(None, "minimap2_threads")
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - > {output}"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print {params.samplename} $0}}' | bond - ../reads.cfg --dheader --dropid samplename,refname,contig,readid,alen > {output}"
 
 rule presetup_checkm:
     output: directory("checkm")

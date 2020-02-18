@@ -1,7 +1,6 @@
 import pysam
 import sys
 
-print ("Genome\tContig\tQueryName\tALen")
 samfile = pysam.AlignmentFile(sys.argv[1], "r")
 for align in samfile:
     if not align.is_supplementary \
