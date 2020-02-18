@@ -33,7 +33,7 @@ rule map_reads:
     output:
         "{path}.map.stat"
     threads: lambda w: n_threads(None, "minimap2_threads")
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print \"{params.samplename}\t\" $0}}' | bond - ../reads.cfg --dheader samplename,refname,contig,readid,alen --dropid > {output}"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print \"{params.samplename}\t\" $0}}' | bond - ../reads.cfg --dheader samplename,refname,contig,readid,alen --dropid | bond - ../ref.cfg --dcol 2 --dropid > {output}"
 
 rule presetup_checkm:
     output: directory("checkm")
