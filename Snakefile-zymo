@@ -12,8 +12,24 @@ rule finish_zymo:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
         checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa")),
         fastmer="fastmer-result.txt",
+        reads_mapped=enumerate_reads(suffix=".map.stat", cols=["ont"]),
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
+
+#TODO WIll want to perhaps genericise this for multiple ref sets
+rule merge_refs:
+    input: [references.loc[g]["ref"] for g in GENOMES if references.loc[g]["ref"] != '-']
+    output: "super_ref.fa"
+    shell: "for ref in {input}; do rname=`basename ${{ref}} | cut -f1 -d'.'`; sed \"s,^>,>${{rname}}__,\" $ref >> {output}; done > {output}"
+
+rule map_reads:
+    input:
+        ref="super_ref.fa",
+        reads="{path}"
+    output:
+        "{path}.map.stat"
+    threads: lambda w: n_threads(None, "minimap2_threads")
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - > {output}"
 
 rule presetup_checkm:
     output: directory("checkm")

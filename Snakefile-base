@@ -214,7 +214,7 @@ def align_polish_reads_input(w):
 
 def n_threads(w, key=""):
     n_threads = workflow.global_resources['_cores']
-    if samples.loc[w.uuid].get("cpu", '-') != '-':
+    if w and samples.loc[w.uuid].get("cpu", '-') != '-':
         try:
             n_threads = int(samples.loc[w.uuid]["cpu"])
         except ValueError:

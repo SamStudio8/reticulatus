@@ -14,6 +14,6 @@ for align in samfile:
         except KeyError:
            # exclude alignments if supplementary exists
            ref = samfile.get_reference_name(align.reference_id)
-           ref, contig = ref.split("_")
+           ref, contig = ref.split("__")
 
            print ("%s\t%s\t%s\t%s" % (ref, contig, align.query_name, align.alen))
