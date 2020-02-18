@@ -20,7 +20,9 @@ rule finish_zymo:
 rule merge_refs:
     input: [references.loc[g]["ref"] for g in GENOMES if references.loc[g]["ref"] != '-']
     output: "super_ref.fa"
-    shell: "for ref in {input}; do rname=`basename ${{ref}} | cut -f1 -d'.'`; sed \"s,^>,>${{rname}}__,\" $ref >> {output}; done > {output}"
+    params:
+        refnames=lambda w: [references.loc[g]["refname"] for g in GENOMES if references.loc[g]["ref"] != '-']
+    shell: "REFS=({input}); NAMES=({params.refnames}); for ((i=0;i<${{#REFS[@]}};++i)); do sed \"s,^>,>${{NAMES[i]}}__,\" ${{REFS[i]}}; done > {output}"
 
 rule map_reads:
     input:
