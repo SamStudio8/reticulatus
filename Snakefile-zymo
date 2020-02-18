@@ -10,7 +10,7 @@ del GENOMES['default']
 rule finish_zymo:
     input:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
-        checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa")),
+        #checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa")),
         fastmer="fastmer-result.txt",
         reads_mapped=enumerate_reads(suffix=".map.stat", cols=["ont"]),
     output: touch("reticulated.zymo.ok")
