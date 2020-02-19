@@ -41,16 +41,6 @@ rule map_reads_summary:
     output: "{path}.map.stat.summary.tsv"
     shell: "Rscript ../scripts/zymo/nickloman/summariseStats.R {input} {output}"
 
-rule presetup_checkm:
-    output: directory("checkm")
-    shell: "mkdir checkm; cd checkm; wget https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz; tar xvf checkm_data_2015_01_16.tar.gz"
-
-rule setup_checkm:
-    conda: "environments/checkm.yaml"
-    input: directory("checkm")
-    output: touch("checkm_setup.ok")
-    shell: "echo 'checkm/' | checkm data setRoot 'checkm/'"
-
 rule extract_kraken_contigs:
     input:
         assembly="{assembly}",
@@ -62,42 +52,52 @@ rule extract_kraken_contigs:
     shell:
         "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/zymo/ensure_genomes.py {output} {params.genomes}"
 
-def checkm_pick_taxon(w):
-    refname =  references["refname"].get(w.genome, 'default')
-    return {
-        "rank": references.loc[refname]["rank"],
-        "genome": references.loc[refname]["taxon"]
-    }
-
-# This rule is a little annoying, we *should* be explicitly naming the input
-# FASTA needed for the checkM bin as extracted by our kraken script.
-# Unfortunately, as the extract_kraken_contigs rule output is defined as a dictionary
-# we cannot explicitly name an input inside that directory without a ChildIOException.
-# That rule has a python script that attempts to guarantee those files exist, so
-# as long as the directory exists, we can be reasonably confident the FASTA do too.
-#   As gross as it sounds, the requisite `cp` will fail if it *really* doesn't exist.
-# So this isn't a particularly unsafe workaround, just a gross one.
-rule checkm:
-    input:
-        ok="checkm_setup.ok",
-        d=directory("extracted_contigs/{assembly}/")
-        #fa="extracted_contigs/{assembly}/{genome}.fasta"
-    output:
-        working=directory("checkm-working/{assembly}/{genome}"),
-        bin=directory("checkm-bins/{assembly}/{genome}/"),
-        res="checkm-results/{assembly}/{genome}.tsv"
-    params: p=checkm_pick_taxon
-    conda: "environments/checkm.yaml"
-    threads: 8
-    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -q -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.res}"
-
-rule merge_checkm:
-    input:
-        logs=expand("checkm-results/{{assembly}}/{genome}.tsv", genome=GENOMES)
-    output:
-        "checkm-{assembly}.txt"
-    shell:
-        "cat {input.logs} > {output}"
+#rule presetup_checkm:
+#    output: directory("checkm")
+#    shell: "mkdir checkm; cd checkm; wget https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz; tar xvf checkm_data_2015_01_16.tar.gz"
+#
+#rule setup_checkm:
+#    conda: "environments/checkm.yaml"
+#    input: directory("checkm")
+#    output: touch("checkm_setup.ok")
+#    shell: "echo 'checkm/' | checkm data setRoot 'checkm/'"
+#
+#def checkm_pick_taxon(w):
+#    refname =  references["refname"].get(w.genome, 'default')
+#    return {
+#        "rank": references.loc[refname]["rank"],
+#        "genome": references.loc[refname]["taxon"]
+#    }
+#
+## This rule is a little annoying, we *should* be explicitly naming the input
+## FASTA needed for the checkM bin as extracted by our kraken script.
+## Unfortunately, as the extract_kraken_contigs rule output is defined as a dictionary
+## we cannot explicitly name an input inside that directory without a ChildIOException.
+## That rule has a python script that attempts to guarantee those files exist, so
+## as long as the directory exists, we can be reasonably confident the FASTA do too.
+##   As gross as it sounds, the requisite `cp` will fail if it *really* doesn't exist.
+## So this isn't a particularly unsafe workaround, just a gross one.
+#rule checkm:
+#    input:
+#        ok="checkm_setup.ok",
+#        d=directory("extracted_contigs/{assembly}/")
+#        #fa="extracted_contigs/{assembly}/{genome}.fasta"
+#    output:
+#        working=directory("checkm-working/{assembly}/{genome}"),
+#        bin=directory("checkm-bins/{assembly}/{genome}/"),
+#        res="checkm-results/{assembly}/{genome}.tsv"
+#    params: p=checkm_pick_taxon
+#    conda: "environments/checkm.yaml"
+#    threads: 8
+#    shell: "cp extracted_contigs/{wildcards.assembly}/{wildcards.genome}.fasta {output.bin}; checkm taxonomy_wf -q -t {threads} -x fasta {params.p[rank]} {params.p[genome]:q} {output.bin} {output.working} > {output.res}"
+#
+#rule merge_checkm:
+#    input:
+#        logs=expand("checkm-results/{{assembly}}/{genome}.tsv", genome=GENOMES)
+#    output:
+#        "checkm-{assembly}.txt"
+#    shell:
+#        "cat {input.logs} > {output}"
 
 def fastmer_get_ref(genome):
     refname = references["refname"].get(genome, 'default')
