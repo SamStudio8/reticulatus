@@ -16,11 +16,31 @@ rule finish_zymo:
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
 
+def retic_get_ref(refgroup, genome):
+    r = references.loc[refgroup]
+    print(r)
+    print(refgroup, genome)
+    refname = r["refname"].get(genome, 'default')
+    refloc = r.loc[refname]["ref"] if r.loc[refname]["ref"] != '-' else None
+    if refloc and refloc.startswith("HTTP"):
+        refloc = "download/refs/%s_%s.fa" % (refgroup, refname)
+    return refloc
+
+#from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
+#HTTP = HTTPRemoteProvider()
+rule download_ref:
+    #input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
+    params:
+        remote=lambda w: references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", "")
+    output: "download/refs/{refgroup,[A-z0-9_-]*}.{ref}"
+    run:
+        shell("wget {params.remote} -O {output}")
+
 def get_refgroup_by_uuid(uuid):
     return samples.loc[uuid]["refgroup"]
 
 def get_ref_paths_by_group(refgroup):
-    return references.loc[refgroup]["ref"]
+    return [retic_get_ref(refgroup, ref) for ref in references.loc[refgroup]["refname"]]
 
 def get_ref_names_by_group(refgroup):
     return references.loc[refgroup]["refname"]
@@ -110,27 +130,9 @@ rule extract_kraken_contigs:
 #    shell:
 #        "cat {input.logs} > {output}"
 
-def fastmer_get_ref(refgroup, genome):
-    r = references.loc[refgroup]
-    refname = r["refname"].get(genome, 'default')
-    refloc = r.loc[refname]["ref"] if r.loc[refname]["ref"] != '-' else None
-    if refloc and refloc.startswith("HTTP"):
-        refloc = "download/refs/%s.fa" % refname
-    return refloc
-
-#from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
-#HTTP = HTTPRemoteProvider()
-rule download_ref:
-    #input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
-    params:
-        remote=lambda w: references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", "")
-    output: "download/refs/{ref}"
-    run:
-        shell("wget {params.remote} -O {output}")
-
 rule jts_fastmer:
     input:
-        reference=lambda w: fastmer_get_ref(get_refgroup_by_uuid(w.uuid), w.genome),
+        reference=lambda w: retic_get_ref(get_refgroup_by_uuid(w.uuid), w.genome),
         assembly="{uuid}.{assembly}",
     output:
         res="fastmer-results/{uuid,[A-z0-9_-]*}.{assembly}/{genome}.tsv",
@@ -140,8 +142,8 @@ rule jts_fastmer:
 
 rule merge_fastmer:
     input:
-        #logs=lambda w: expand("fastmer-results/{{uuid}}.{{assembly}}/{genome}.tsv", genome=[ref for ref in get_ref_names_by_group(get_refgroup_by_uuid(w.uuid)) if fastmer_get_ref(get_refgroup_by_uuid(w.uuid), ref)])
-        logs=lambda w: ["fastmer-results/{uuid}.{assembly}/%s.tsv" % g for g in [ref for ref in get_ref_names_by_group(get_refgroup_by_uuid(w.uuid)) if get_refgroup_by_uuid(w.uuid) != '-' and fastmer_get_ref(get_refgroup_by_uuid(w.uuid), ref)]]
+        #logs=lambda w: expand("fastmer-results/{{uuid}}.{{assembly}}/{genome}.tsv", genome=[ref for ref in get_ref_names_by_group(get_refgroup_by_uuid(w.uuid)) if retic_get_ref(get_refgroup_by_uuid(w.uuid), ref)])
+        logs=lambda w: ["fastmer-results/{uuid}.{assembly}/%s.tsv" % g for g in [ref for ref in get_ref_names_by_group(get_refgroup_by_uuid(w.uuid)) if get_refgroup_by_uuid(w.uuid) != '-' and retic_get_ref(get_refgroup_by_uuid(w.uuid), ref)]]
     output:
         "fastmer-{uuid,[A-z0-9_-]*}.{assembly}.txt"
     shell:
