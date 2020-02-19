@@ -557,7 +557,7 @@ rule ktkit_rollup:
     input:
         k2o="{uuid}.{prefix}.fa.k2",
         depth="{uuid}.{prefix}.fa.depth",
-        ok=touch(os.path.join(config["ktkit_database_root"], "ktkit.ok")),
+        ok=os.path.join(config["ktkit_database_root"], "ktkit.ok"),
     params:
         only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else "",
     output:
@@ -568,7 +568,7 @@ rule ktkit_rollup:
 rule ktkit_count:
     input:
         k2o="{path}.k2",
-        ok=touch(os.path.join(config["ktkit_database_root"], "ktkit.ok")),
+        ok=os.path.join(config["ktkit_database_root"], "ktkit.ok"),
     output:
         k2k="{path}.k2kc"
     threads: 1
