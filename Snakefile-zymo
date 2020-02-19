@@ -28,8 +28,8 @@ def retic_get_ref(refgroup, genome):
 rule download_ref:
     #input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
     params:
-        remote=lambda w: references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", "")
-    output: "download/refs/{refgroup,[A-z0-9_-]*}/{ref}"
+        remote=lambda w: references.loc[w.refgroup, w.ref]["ref"].replace("HTTP:", "")
+    output: "download/refs/{refgroup,[A-z0-9_-]*}/{ref}.fa"
     run:
         shell("wget {params.remote} -O {output}")
 
@@ -37,13 +37,13 @@ def get_refgroup_by_uuid(uuid):
     return samples.loc[uuid]["refgroup"]
 
 def get_ref_paths_by_group(refgroup):
-    return [retic_get_ref(refgroup, ref) for ref in references.loc[refgroup]["refname"]]
+    return [retic_get_ref(refgroup, ref) for ref in references.loc[refgroup]["refname"].values.tolist()]
 
 def get_ref_names_by_group(refgroup):
-    return references.loc[refgroup]["refname"]
+    return references.loc[refgroup]["refname"].values.tolist() # ffs pandas
 
 def get_ref_tids_by_group(refgroup):
-    return references.loc[refgroup]["ncbi_tid"]
+    return references.loc[refgroup][["ncbi_tid"]]
 
 #TODO WIll want to perhaps genericise this for multiple ref sets
 rule merge_refs:
