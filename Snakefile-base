@@ -516,6 +516,13 @@ rule download_kraken_database:
         t=os.path.join(config["kraken2_database_root"], "taxo.k2d"),
     shell: "bash ../scripts/download_kraken2_db.sh %s" % config["kraken2_database_root"]
 
+rule download_ktkit_database:
+    output:
+        ok=touch(os.path.join(config["ktkit_database_root"], "ktkit.ok")),
+        nodes=os.path.join(config["ktkit_database_root"], "nodes.dmp"),
+        names=os.path.join(config["ktkit_database_root"], "names.dmp"),
+    shell: "mkdir -p %s; cd %s; wget ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz; tar xvf taxdump.tar.gz" % (config["ktkit_database_root"], config["ktkit_database_root"])
+
 rule kraken:
     input:
         #fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
@@ -537,21 +544,23 @@ rule ktkit_rollup:
     input:
         k2o="{uuid}.{prefix}.fa.k2",
         depth="{uuid}.{prefix}.fa.depth",
+        ok=touch(os.path.join(config["ktkit_database_root"], "ktkit.ok")),
     params:
         only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else "",
         #uuid=lambda w, input: input.k2o.split(".")[0],
     output:
         k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2kr"
     threads: 1
-    shell: "ktkit rollup {input.k2o} --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,contig_len,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} --dropid | cut -f 2- > {output}"
+    shell: "ktkit rollup {input.k2o} --dump %s --rank species {params.only} | bond - {input.depth} --dcol 2 --dheader kstate,contig,ktax,contig_len,kmer,ktkit_tid,ktkit_name --append uuid:{wildcards.uuid},suffix:{wildcards.prefix} --dropid | cut -f 2- > {output}" % config["ktkit_database_root"]
 
 rule ktkit_count:
     input:
         k2o="{path}.k2",
+        ok=touch(os.path.join(config["ktkit_database_root"], "ktkit.ok")),
     output:
         k2k="{path}.k2kc"
     threads: 1
-    shell: "echo -e 'ktkit_tid\tktkit_name\tmean_seq_len\tn_seq\tprop_seq\tn_seq_unmasked\ttot_bp\tprop_bp\tprop_bp_unmasked' > {output}; ktkit count {input.k2o} --rank species >> {output}"
+    shell: "echo -e 'ktkit_tid\tktkit_name\tmean_seq_len\tn_seq\tprop_seq\tn_seq_unmasked\ttot_bp\tprop_bp\tprop_bp_unmasked' > {output}; ktkit count {input.k2o} --dump %s --rank species >> {output}" % config["ktkit_database_root"]
 
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
