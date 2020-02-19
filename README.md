@@ -56,10 +56,17 @@ Replace the YAML keys as appropriate. Keys are:
 |-----|------|-------------|
 | `dehumanizer_database_root` | Path, optional | empty directory in which to download the dehumanizer references (requires ~8.5GB), you can ignore this if you're not going to remove contigs assigned as human by `kraken2` |
 | `kraken2_database_root` | Path | path to pre-built kraken2 database (*i.e.* the directory containing the `.k2d` files), or the path to a directory in which to `wget` a copy of our 30GB [microbial database](https://lomanlab.github.io/mockcommunity/mc_databases.html). **If the database already exists, you must** `touch k2db.ok` in this directory or **bad things** will happen |
+| `ktkit_database_root` | Path | path to a directory in which to `wget` a copy of the NCBI taxonomy dump (500 MB, tops) |
 | `slack_token` | str, optional | if you want to be bombarded with slack messages regarding the success and failure of your snakes, insert a suitable bot API token here |
 | `slack_channel` | str, optional | if using a `slack_token`, enter the name of the channel to send messages, including the leading `#` |
 | `cuda` | boolean | set to `False` if you do not want GPU-acceleration and `True` if you have the means to go very fast (*i.e.* you have a CUDA-compatible GPU) |
-| `medaka_env` | URI | path to a singularity image (simg) or sandbox container to run medaka (GPU) |
+| `medaka_env` | URI | path to a singularity image (simg) or sandbox container to run medaka (CPU or GPU) |
+| `racon_batches`| int | number of simultaneous batches to process on GPU |
+| `polish_threads` | int | number of CPU threads to use for any polishing step |
+| `polish_gpu` | int | number of GPU devices to use for any on-GPU polishing step |
+| `assembly_threads` | int | number of CPU threads to use for any assembly step |
+| `minimap2_threads` | int | number of CPU threads to use for any minimap2 step |
+| `sort_flags` | str | additional parameters to pass to any `samtools sort` command (*.e.g.* to raise in-memory sort limit) |
 
 ### (3) Tell reticulatus about your reads
 
