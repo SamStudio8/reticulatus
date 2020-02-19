@@ -4,8 +4,7 @@ import pandas as pd
 include: "Snakefile-base"
 
 references = pd.read_table("../ref.cfg").set_index(["refgroup", "refname"], drop=False)
-GENOMES = references["refname"]
-del GENOMES['default']
+GENOMES = True
 
 rule finish_zymo:
     input:
@@ -43,13 +42,14 @@ def get_ref_paths_by_group(refgroup):
 def get_ref_names_by_group(refgroup):
     return references.loc[refgroup]["refname"]
 
+def get_ref_tids_by_group(refgroup):
+    return references.loc[refgroup]["ncbi_tid"]
+
 #TODO WIll want to perhaps genericise this for multiple ref sets
 rule merge_refs:
-    #input: [references.loc[g]["ref"] for g in GENOMES if references.loc[g]["ref"] != '-']
     input: lambda w: get_ref_paths_by_group(w.refgroup)
     output: "{refgroup,[A-z0-9_-]*}.super_ref.fa"
     params:
-        #refnames=lambda w: [references.loc[g]["refname"] for g in GENOMES if references.loc[g]["ref"] != '-']
         refnames=lambda w: get_ref_names_by_group(w.refgroup)
     shell: "REFS=({input}); NAMES=({params.refnames}); for ((i=0;i<${{#REFS[@]}};++i)); do sed \"s,^>,>${{NAMES[i]}}__,\" ${{REFS[i]}}; done > {output}"
 
@@ -72,14 +72,14 @@ rule map_reads_summary:
 
 rule extract_kraken_contigs:
     input:
-        assembly="{assembly}",
-        k2="{assembly}.k2",
+        assembly="{uuid}.{assembly}",
+        k2="{uuid}.{assembly}.k2",
     params:
-        genomes=list(GENOMES),
+        refnames=lambda w: get_ref_names_by_group(get_refgroup_by_uuid(w.uuid))
     output:
-        directory("extracted_contigs/{assembly}/")
+        directory("extracted_contigs/{uuid,[A-z0-9_-]*}.{assembly}/")
     shell:
-        "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/zymo/ensure_genomes.py {output} {params.genomes}"
+        "python ../scripts/extract_contigs_with_kraken.py {input.k2} {input.assembly} {output}; python ../scripts/zymo/ensure_genomes.py {output} {params.refnames}"
 
 #rule presetup_checkm:
 #    output: directory("checkm")

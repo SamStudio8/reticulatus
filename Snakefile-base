@@ -559,7 +559,7 @@ rule ktkit_rollup:
         depth="{uuid}.{prefix}.fa.depth",
         ok=os.path.join(config["ktkit_database_root"], "ktkit.ok"),
     params:
-        only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else "",
+        only=lambda w: "--only " + ",".join(str(x) for x in get_ref_tids_by_group(get_refgroup_by_uuid(w.uuid))) if samples.loc[w.uuid]["refgroup"] != "-" else "",
     output:
         k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2kr"
     threads: 1
