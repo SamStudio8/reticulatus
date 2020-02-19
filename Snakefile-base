@@ -283,7 +283,6 @@ def enumerate_reads(cols=["ont", "i1", "i2"], suffix="", refgroup=False):
             path = get_reads(fw, col)
             if path and path != '-':
                 read_paths.add(path + group + suffix)
-    print(read_paths)
     return read_paths
 
 
