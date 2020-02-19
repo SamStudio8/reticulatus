@@ -252,11 +252,13 @@ def unroll_assemblies(w, name, unroll=True):
         end_polish_f[-1] = str(end_iter-1)
         return [name] + unroll_assemblies(w, ".".join(polishes[:-1] + ["-".join(end_polish_f)]))
 
-def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=False):
+def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=False, refgroup=False):
     base_assemblies = []
     polished_assemblies = []
     for uuid in samples["uuid"]:
         conf = samples.loc[uuid]["spell"]
+        if refgroup and samples.loc[uuid]["refgroup"] == "-":
+            continue
         if samples.loc[uuid]["repolish"] == '-':
             base_assemblies.append( "%s%s.%s.ctg.cns%s" % (prefix, uuid, conf, suffix) )
 
@@ -266,16 +268,22 @@ def enumerate_assemblies(w=None, prefix="", suffix="", unroll=True, base_only=Fa
             polished_assemblies.extend(context)
     return base_assemblies + polished_assemblies
 
-def enumerate_reads(cols=["ont", "i1", "i2"], suffix=""):
+def enumerate_reads(cols=["ont", "i1", "i2"], suffix="", refgroup=False):
     read_paths = set([])
     FakeWildcard = namedtuple('Wildcard', 'uuid')
 
     for uuid in samples["uuid"]:
         fw = FakeWildcard(uuid=uuid)
+        group = ""
+        if refgroup:
+            group = ".%s" % samples.loc[uuid]["refgroup"]
+            if group == ".-":
+                continue
         for col in cols:
             path = get_reads(fw, col)
             if path and path != '-':
-                read_paths.add(path + suffix)
+                read_paths.add(path + group + suffix)
+    print(read_paths)
     return read_paths
 
 
@@ -553,7 +561,6 @@ rule ktkit_rollup:
         ok=touch(os.path.join(config["ktkit_database_root"], "ktkit.ok")),
     params:
         only=lambda w: "--only " + ",".join([str(references.loc[g]["ncbi_tid"]) for g in GENOMES]) if "GENOMES" in globals() else "",
-        #uuid=lambda w, input: input.k2o.split(".")[0],
     output:
         k2k="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2kr"
     threads: 1

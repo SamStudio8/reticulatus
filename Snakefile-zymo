@@ -3,7 +3,7 @@ import pandas as pd
 # Import config, set working dir, load manifest and define default rules:
 include: "Snakefile-base"
 
-references = pd.read_table("../ref.cfg").set_index("refname", drop=False)
+references = pd.read_table("../ref.cfg").set_index(["refgroup", "refname"], drop=False)
 GENOMES = references["refname"]
 del GENOMES['default']
 
@@ -12,33 +12,44 @@ rule finish_zymo:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
         #checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa")),
         fastmer="fastmer-result.txt",
-        reads_mapped=enumerate_reads(suffix=".map.stat.summary.tsv", cols=["ont"]),
+        reads_mapped=enumerate_reads(suffix=".map.stat.summary.tsv", cols=["ont"], refgroup=True),
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
 
+def get_refgroup_by_uuid(uuid):
+    return samples.loc[uuid]["refgroup"]
+
+def get_ref_paths_by_group(refgroup):
+    return references.loc[refgroup]["ref"]
+
+def get_ref_names_by_group(refgroup):
+    return references.loc[refgroup]["refname"]
+
 #TODO WIll want to perhaps genericise this for multiple ref sets
 rule merge_refs:
-    input: [references.loc[g]["ref"] for g in GENOMES if references.loc[g]["ref"] != '-']
-    output: "super_ref.fa"
+    #input: [references.loc[g]["ref"] for g in GENOMES if references.loc[g]["ref"] != '-']
+    input: lambda w: get_ref_paths_by_group(w.refgroup)
+    output: "{refgroup,[A-z0-9_-]*}.super_ref.fa"
     params:
-        refnames=lambda w: [references.loc[g]["refname"] for g in GENOMES if references.loc[g]["ref"] != '-']
+        #refnames=lambda w: [references.loc[g]["refname"] for g in GENOMES if references.loc[g]["ref"] != '-']
+        refnames=lambda w: get_ref_names_by_group(w.refgroup)
     shell: "REFS=({input}); NAMES=({params.refnames}); for ((i=0;i<${{#REFS[@]}};++i)); do sed \"s,^>,>${{NAMES[i]}}__,\" ${{REFS[i]}}; done > {output}"
 
 rule map_reads:
     input:
-        ref="super_ref.fa",
+        ref="{refgroup}.super_ref.fa",
         reads="{path}"
     params:
         samplename=lambda w: reads_lookup.loc[reads_lookup['ont'] == w.path]["samplename"][0],
     output:
-        "{path}.map.stat"
+        "{path}.{refgroup,[A-z0-9_-]*}.map.stat"
     threads: lambda w: n_threads(None, "minimap2_threads")
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print \"{params.samplename}\t\" $0}}' | bond - ../reads.cfg --dheader samplename,refname,contig,readid,alen --dropid | bond - ../ref.cfg --dcol 2 --dropid > {output}"
 
 rule map_reads_summary:
     conda: "environments/r.yaml"
-    input: "{path}.map.stat"
-    output: "{path}.map.stat.summary.tsv"
+    input: "{path}.{refgroup}.map.stat"
+    output: "{path}.{refgroup,[A-z0-9_-]*}.map.stat.summary.tsv"
     shell: "Rscript ../scripts/zymo/nickloman/summariseStats.R {input} {output}"
 
 rule extract_kraken_contigs:
@@ -99,9 +110,10 @@ rule extract_kraken_contigs:
 #    shell:
 #        "cat {input.logs} > {output}"
 
-def fastmer_get_ref(genome):
-    refname = references["refname"].get(genome, 'default')
-    refloc = references.loc[refname]["ref"] if references.loc[refname]["ref"] != '-' else None
+def fastmer_get_ref(refgroup, genome):
+    r = references.loc[refgroup]
+    refname = r["refname"].get(genome, 'default')
+    refloc = r.loc[refname]["ref"] if r.loc[refname]["ref"] != '-' else None
     if refloc and refloc.startswith("HTTP"):
         refloc = "download/refs/%s.fa" % refname
     return refloc
@@ -118,25 +130,26 @@ rule download_ref:
 
 rule jts_fastmer:
     input:
-        reference=lambda w: fastmer_get_ref(w.genome),
-        assembly="{assembly}",
+        reference=lambda w: fastmer_get_ref(get_refgroup_by_uuid(w.uuid), w.genome),
+        assembly="{uuid}.{assembly}",
     output:
-        res="fastmer-results/{assembly}/{genome}.tsv",
-        bam=temp("{assembly}.{genome}.assembly_analysis.sorted.bam"),
-        bai=temp("{assembly}.{genome}.assembly_analysis.sorted.bam.bai"),
+        res="fastmer-results/{uuid,[A-z0-9_-]*}.{assembly}/{genome}.tsv",
+        bam=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam"),
+        bai=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam.bai"),
     shell: "python ../scripts/zymo/jts/fastmer.py --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 > {output.res}"
 
 rule merge_fastmer:
     input:
-        logs=expand("fastmer-results/{{assembly}}/{genome}.tsv", genome=[g for g in GENOMES if fastmer_get_ref(g)])
+        #logs=lambda w: expand("fastmer-results/{{uuid}}.{{assembly}}/{genome}.tsv", genome=[ref for ref in get_ref_names_by_group(get_refgroup_by_uuid(w.uuid)) if fastmer_get_ref(get_refgroup_by_uuid(w.uuid), ref)])
+        logs=lambda w: ["fastmer-results/{uuid}.{assembly}/%s.tsv" % g for g in [ref for ref in get_ref_names_by_group(get_refgroup_by_uuid(w.uuid)) if get_refgroup_by_uuid(w.uuid) != '-' and fastmer_get_ref(get_refgroup_by_uuid(w.uuid), ref)]]
     output:
-        "fastmer-{assembly}.txt"
+        "fastmer-{uuid,[A-z0-9_-]*}.{assembly}.txt"
     shell:
         "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' > {output}"
 
 rule super_merge_fastmer:
     input:
-        logs=expand("fastmer-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa"))
+        logs=expand("fastmer-{uuid}.{assembly}.txt", zip, uuid=[x.split('.')[0] for x in enumerate_assemblies(base_only=False, unroll=True, suffix=".fa", refgroup=True)], assembly=[x.split('.', 1)[1] for x in enumerate_assemblies(base_only=False, unroll=True, suffix=".fa", refgroup=True)])
     output:
         "fastmer-result.txt"
     shell:
