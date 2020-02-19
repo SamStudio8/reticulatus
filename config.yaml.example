@@ -2,6 +2,8 @@ dehumanizer_database_root:
     "path/to/dh/refs"
 kraken2_database_root:
     "path/to/kraken/db"
+ktkit_database_root:
+    "path/to/ktkit/db"
 slack_token:
     ""
 slack_channel:
