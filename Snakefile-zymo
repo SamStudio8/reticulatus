@@ -21,7 +21,7 @@ def retic_get_ref(refgroup, genome):
     refname = r["refname"].get(genome, 'default')
     refloc = r.loc[refname]["ref"] if r.loc[refname]["ref"] != '-' else None
     if refloc and refloc.startswith("HTTP"):
-        refloc = "download/refs/%s_%s.fa" % (refgroup, refname)
+        refloc = "download/refs/%s/%s.fa" % (refgroup, refname)
     return refloc
 
 #from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
@@ -30,7 +30,7 @@ rule download_ref:
     #input: lambda w: HTTP.remote(references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", ""), keep_local=True)
     params:
         remote=lambda w: references.loc[w.ref.replace(".fa", "")]["ref"].replace("HTTP:", "")
-    output: "download/refs/{refgroup,[A-z0-9_-]*}.{ref}"
+    output: "download/refs/{refgroup,[A-z0-9_-]*}/{ref}"
     run:
         shell("wget {params.remote} -O {output}")
 
