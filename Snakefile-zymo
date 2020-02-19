@@ -62,7 +62,7 @@ rule map_reads:
     output:
         "{path}.{refgroup,[A-z0-9_-]*}.map.stat"
     threads: lambda w: n_threads(None, "minimap2_threads")
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print \"{params.samplename}\t\" $0}}' | bond - ../reads.cfg --dheader samplename,refname,contig,readid,alen --dropid | bond - ../ref.cfg --dcol 2 --mcol 2 --dropid > {output}"
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print \"{params.samplename}\t\" \"{wildcards.refgroup}\t\" $0}}' | bond - ../reads.cfg --dheader samplename,refgroup,refname,contig,readid,alen --dropid | bond - ../ref.cfg --dcol 2,3 --mcol 1,2 --dropid > {output}"
 
 rule map_reads_summary:
     conda: "environments/r.yaml"
