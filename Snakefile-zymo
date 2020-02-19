@@ -18,8 +18,6 @@ rule finish_zymo:
 
 def retic_get_ref(refgroup, genome):
     r = references.loc[refgroup]
-    print(r)
-    print(refgroup, genome)
     refname = r["refname"].get(genome, 'default')
     refloc = r.loc[refname]["ref"] if r.loc[refname]["ref"] != '-' else None
     if refloc and refloc.startswith("HTTP"):
