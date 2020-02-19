@@ -286,7 +286,13 @@ def select_gpu_device(wildcards, resources):
     if not config["cuda"] or resources.gpu == 0:
         return None
     import GPUtil
-    available = ",".join([str(x) for x in GPUtil.getAvailable(order = 'random', limit = resources.gpu, maxLoad = 0.5, maxMemory = 0.5, includeNan=False, excludeID=[], excludeUUID=[])])
+    available_l = GPUtil.getAvailable(order = 'random', limit = resources.gpu, maxLoad = 0.5, maxMemory = 0.5, includeNan=False, excludeID=[], excludeUUID=[])
+    available_str = ",".join([str(x) for x in available_l])
+
+    if len(available_l) == 0 and resources.gpu > 0:
+        raise Exception("select_gpu_device did not select any GPUs")
+    elif len(available_l) < resources.gpu:
+        sys.stderr.write("[WARN] select_gpu_device selected fewer GPU devices than requested")
     print("Assigning %d available GPU devices: %s" % (resources.gpu, available))
     return available
 
