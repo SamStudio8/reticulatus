@@ -12,7 +12,7 @@ rule finish_zymo:
         base="reticulated.base.ok", # This will ensure the base rules have finished first
         #checkm=expand("checkm-{assembly}.txt", assembly=enumerate_assemblies(base_only=False, unroll=True, suffix=".fa")),
         fastmer="fastmer-result.txt",
-        reads_mapped=enumerate_reads(suffix=".map.stat", cols=["ont"]),
+        reads_mapped=enumerate_reads(suffix=".map.stat.summary.tsv", cols=["ont"]),
     output: touch("reticulated.zymo.ok")
     shell: 'echo "Reticulated successfully."'
 
@@ -34,6 +34,12 @@ rule map_reads:
         "{path}.map.stat"
     threads: lambda w: n_threads(None, "minimap2_threads")
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x map-ont {input.ref} {input.reads} | python ../scripts/zymo/nickloman/bamstats.py - | awk '{{print \"{params.samplename}\t\" $0}}' | bond - ../reads.cfg --dheader samplename,refname,contig,readid,alen --dropid | bond - ../ref.cfg --dcol 2 --dropid > {output}"
+
+rule map_reads_summary:
+    conda: "environments/r.yaml"
+    input: "{path}.map.stat"
+    output: "{path}.map.stat.summary.tsv"
+    shell: "Rscript ../scripts/zymo/nickloman/summariseStats.R {input} {output}"
 
 rule presetup_checkm:
     output: directory("checkm")
@@ -135,13 +141,3 @@ rule super_merge_fastmer:
         "fastmer-result.txt"
     shell:
         "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' | bond - ../manifest.cfg --greedy | bond - ../reads.cfg --dcol 18 > {output}"
-
-#rule nl_align_ref:
-#    shell: "minimap2 -a -x map-ont -t 12 assemblies/illumina/spades/Zymo-Isolates-SPAdes-Illumina.fasta.gz $fastq | samtools sort -@12 -m100G - -o results/$run.sorted.bam; samtools index results/$run.sorted.bam"
-
-#rule nl_bam_stats:
-#    shell: "samtools view -h results/$run.sorted.bam | python ../scripts/zymo/nickloman/bamstats.py - > results/$run.stats.txt"
-
-#rule nl_align_summary:
-#    conda: "environments/R.yaml"
-#    shell: "Rscript ../scripts/zymo/nickloman/summariseStats.R results/$run.stats.txt $metadata results/$run"

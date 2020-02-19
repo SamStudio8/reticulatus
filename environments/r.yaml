@@ -1,0 +1,7 @@
+channels:
+  - r
+dependencies:
+  - r-base
+  - r-dplyr
+  - r-gtools
+  - r-readr
