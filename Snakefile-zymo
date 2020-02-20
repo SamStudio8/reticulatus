@@ -43,7 +43,7 @@ def get_ref_names_by_group(refgroup):
     return references.loc[refgroup]["refname"].values.tolist() # ffs pandas
 
 def get_ref_tids_by_group(refgroup):
-    return references.loc[refgroup][["ncbi_tid"]]
+    return references.loc[refgroup]["ncbi_tid"].values.tolist()
 
 #TODO WIll want to perhaps genericise this for multiple ref sets
 rule merge_refs:
