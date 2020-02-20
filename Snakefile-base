@@ -300,8 +300,8 @@ def select_gpu_device(wildcards, resources):
         raise Exception("select_gpu_device did not select any GPUs")
     elif len(available_l) < resources.gpu:
         sys.stderr.write("[WARN] select_gpu_device selected fewer GPU devices than requested")
-    print("Assigning %d available GPU devices: %s" % (resources.gpu, available))
-    return available
+    print("Assigning %d available GPU devices: %s" % (resources.gpu, available_str))
+    return available_str
 
 
 rule finish:
