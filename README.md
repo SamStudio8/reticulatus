@@ -40,7 +40,7 @@ conda activate reticulatus
 cp Snakefile-base Snakefile
 ```
 
-You will almost certaintly want the `Snakefile-base` rule set for the time being. Run `Snakefile-zymo`to replicate our [mock community benchmarking pipeline](https://github.com/LomanLab/mockcommunity).
+You will almost certaintly want the `Snakefile-base` rule set for the time being. Run `Snakefile-ref` with an appropriate `ref.cfg` to replicate our [mock community benchmarking pipeline](https://github.com/LomanLab/mockcommunity).
 
 **Note** It is important that you ensure `snakemake-minimal` package is installed automatically using the environment specified above. Not only is this easier, but makes sure that the version installed is suitable for the overriden `shell.py` that ships with `reticulatus`.
 
