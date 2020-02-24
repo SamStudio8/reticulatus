@@ -67,8 +67,12 @@ rule map_reads:
 rule map_reads_summary:
     conda: "environments/r.yaml"
     input: "{path}.{refgroup}.map.stat"
-    output: "{path}.{refgroup,[A-z0-9_-]*}.map.stat.summary.tsv"
+    output: "{path}.{refgroup,[A-z0-9_-]*}.map.stat.sumr.tsv"
     shell: "Rscript ../scripts/zymo/nickloman/summariseStats.R {input} {output}"
+rule bond_map_reads_summary:
+    input: "{path}.{refgroup}.map.stat.sumr.tsv"
+    output: "{path}.{refgroup,[A-z0-9_-]*}.map.stat.summary.tsv"
+    shell: "bond {input} ../reads.cfg --dropid > {output}"
 
 rule extract_kraken_contigs:
     input:

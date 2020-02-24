@@ -15,7 +15,7 @@ tsv_path = args[2]
 st=read.table(statsfn, sep="\t", head=T, row.names=NULL, na=c("-"))
 st$alen <- as.numeric(st$alen) # wtf is R
 
-
+samplename <- st[1,]$samplename
 a=st %>% group_by(refname) %>% 
          summarise(n=n(),
                    bases=sum(alen),
@@ -31,9 +31,10 @@ total=sum(b$bases)
 c=b %>% mutate(Cov = bases/(size*1e6)) %>%
         mutate(Perc = bases/total * 100) %>%
         mutate(FoldChange = foldchange(Perc, abundance)) %>%
+        mutate(samplename=samplename) %>%
         arrange(Perc)
    
-write_tsv(c %>% select(refname, n, bases, meanlen, medianlen, N50, maxlen, Cov, Perc, abundance, FoldChange, celltype), tsv_path)
+write_tsv(c %>% select(samplename, refname, n, bases, meanlen, medianlen, N50, maxlen, Cov, Perc, abundance, FoldChange, celltype), tsv_path)
 
 #print(c%>%select(refname,bases,N50,Cov,Perc,abundance,FoldChange,celltype))
 
