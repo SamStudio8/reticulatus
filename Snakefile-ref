@@ -162,7 +162,7 @@ rule merge_fastmer:
 
 rule super_merge_fastmer:
     input:
-        logs=expand("fastmer-{uuid}.{assembly}.txt", zip, uuid=[x.split('.')[0] for x in enumerate_assemblies(base_only=False, unroll=True, suffix=".fa", refgroup=True)], assembly=[x.split('.', 1)[1] for x in enumerate_assemblies(base_only=False, unroll=True, suffix=".fa", refgroup=True)])
+        logs=expand("fastmer-{uuid}.{assembly}.txt", zip, uuid=[x.split('.')[0] for x in enumerate_assemblies(base_only=False, unroll=True, suffix=".fa", refgroup=True)], assembly=[x.split('.', 1)[1] for x in enumerate_assemblies(base_only=False, unroll=True, suffix=".fa", refgroup=True)]) # what the fuck
     output:
         "fastmer-result.txt"
     shell:
