@@ -2,5 +2,6 @@ channels:
   - bioconda
   - conda-forge
 dependencies:
+  - minimap2
   - pip:
     - git+https://github.com/dpryan79/Rebaler.git@fix6
