@@ -1,0 +1,6 @@
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - pip:
+    - git+https://github.com/rrwick/Rebaler.git

@@ -584,8 +584,6 @@ rule install_flye_hash:
         hash=lambda w: spells[w.conf]["hash"],
     shell: "mkdir -p git/{wildcards.conf}; cd git/{wildcards.conf}; git clone https://github.com/fenderglass/Flye.git; cd Flye; git reset --hard {params.hash}; make"
 
-
-
 rule flye_assembly:
     conda: "environments/flye.yaml"
     input:
@@ -707,6 +705,21 @@ rule wtdbg2_24_assembly:
     benchmark: "benchmarks/{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
     shell:
         "git/{wildcards.conf}/wtdbg2/wtdbg2 -f -i {input.reads} -o {params.prefix} -S {params.sampler} -e {params.edge} -k {params.kmer} -p {params.pmer} -L {params.length} -K {params.max_k} --node-max {params.max_node} -X {params.max_k} -g {params.genome_size} -t {threads}"
+
+rule rebaler_assembly:
+    conda: "environments/rebaler.yaml"
+    input:
+        reads=lambda w: get_reads(w, 'ont'),
+        ref=lambda w: "%s.super_ref.fa" % samples.loc[w.uuid]["refgroup"],
+        #ready=lambda w: "%s.ok" % samples.loc[w.uuid]["spell"],
+    output:
+        fa="{uuid}.{conf,rebaler[A-z0-9._-]*}.ctg.cns.fa",
+        gfa=touch("{uuid}.{conf,rebaler[A-z0-9._-]*}.ctg.cns.gfa")
+    threads: lambda w: n_threads(w, "assembly_threads")
+    resources:
+        benchmark=1,
+    benchmark: "benchmarks/{uuid}.{conf,rebaler[A-z0-9_-]*}.ctg.cns.fa"
+    shell: "rebaler {input.ref} {input.reads} > {output.fa}"
 
 rule test_assembly:
     input: "{uuid}.{conf}.ctg.cns.fa"
