@@ -720,7 +720,7 @@ rule rebaler_assembly:
         benchmark=1,
     log: "log/{uuid}.{conf,rebaler[A-z0-9._-]*}.ctg.cns.fa"
     benchmark: "benchmarks/{uuid}.{conf,rebaler[A-z0-9_-]*}.ctg.cns.fa"
-    shell: "rebaler {input.ref} {input.reads} > {output.fa} 2> {log}"
+    shell: "rebaler --base-only {input.ref} {input.reads} > {output.fa} 2> {log}"
 
 rule test_assembly:
     input: "{uuid}.{conf}.ctg.cns.fa"

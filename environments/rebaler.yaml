@@ -4,4 +4,4 @@ channels:
 dependencies:
   - minimap2
   - pip:
-    - git+https://github.com/dpryan79/Rebaler.git@fix6
+    - git+https://github.com/samstudio8/Rebaler.git
