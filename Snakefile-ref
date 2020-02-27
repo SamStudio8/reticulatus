@@ -60,6 +60,7 @@ def get_samplename_from_readpath(path):
         for samplename in reads_lookup["samplename"]:
             if os.path.basename(path).split(".")[0] == samplename:
                 return samplename
+    raise Exception
 
 rule map_reads:
     input:
