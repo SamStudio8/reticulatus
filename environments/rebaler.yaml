@@ -3,4 +3,4 @@ channels:
   - conda-forge
 dependencies:
   - pip:
-    - git+https://github.com/rrwick/Rebaler.git
+    - git+https://github.com/dpryan79/Rebaler.git@fix6
