@@ -511,7 +511,7 @@ rule bond_summarise_kraken:
     output:
         "kraken_summary.bond.tsv"
     shell:
-        "bond {input} ../manifest.cfg --dcol 13 --dropid > {output}"
+        "bond {input} ../manifest.cfg --dcol uuid --dropid > {output}"
 
 rule summarise_kraken:
     input:
