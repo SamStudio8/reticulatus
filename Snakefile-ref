@@ -149,7 +149,7 @@ rule jts_fastmer:
         res="fastmer-results/{uuid,[A-z0-9_-]*}.{assembly}/{genome}.tsv",
         bam=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam"),
         bai=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam.bai"),
-    shell: "python ../scripts/zymo/jts/fastmer.py --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 > {output.res}"
+    shell: "python ../scripts/zymo/jts/fastmer.py --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 | bond - ../manifest.cfg --greedy --append suffix:{wildcards.assembly},refname:{wildcards.genome} > {output.res}"
 
 rule merge_fastmer:
     input:
@@ -158,7 +158,7 @@ rule merge_fastmer:
     output:
         "fastmer-{uuid,[A-z0-9_-]*}.{assembly}.txt"
     shell:
-        "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' | bond - ../manifest.cfg --greedy --append suffix:{wildcards.assembly} > {output}"
+        "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' > {output}"
 
 rule super_merge_fastmer:
     input:
@@ -166,4 +166,4 @@ rule super_merge_fastmer:
     output:
         "fastmer-result.txt"
     shell:
-        "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' | bond - ../reads.cfg --dcol samplename > {output}"
+        "cat {input.logs} | awk '!/^assembly_name/ || ++n < 2' | bond - ../reads.cfg --dcol samplename --dropid | bond - ../ref.cfg --dcol refgroup,refname --mcol refgroup,refname --dropid > {output}"
