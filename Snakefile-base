@@ -718,8 +718,9 @@ rule rebaler_assembly:
     threads: lambda w: n_threads(w, "assembly_threads")
     resources:
         benchmark=1,
+    log: "log/{uuid}.{conf,rebaler[A-z0-9._-]*}.ctg.cns.fa"
     benchmark: "benchmarks/{uuid}.{conf,rebaler[A-z0-9_-]*}.ctg.cns.fa"
-    shell: "rebaler {input.ref} {input.reads} > {output.fa}"
+    shell: "rebaler {input.ref} {input.reads} > {output.fa} 2> {log}"
 
 rule test_assembly:
     input: "{uuid}.{conf}.ctg.cns.fa"
