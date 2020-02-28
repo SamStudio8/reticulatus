@@ -3,7 +3,7 @@ import pandas as pd
 # Import config, set working dir, load manifest and define default rules:
 include: "Snakefile-base"
 
-references = pd.read_table("../ref.cfg").set_index(["refgroup", "refname"], drop=False)
+references = pd.read_csv("../ref.cfg", sep="\t").set_index(["refgroup", "refname"], drop=False)
 GENOMES = True
 
 rule finish_zymo:

@@ -152,8 +152,8 @@ onerror:
             pass
 
 # Load manifest(s)
-samples = pd.read_table("../manifest.cfg").set_index("uuid", drop=False)  # defines the assembly and polishing strategies
-reads_lookup = pd.read_table("../reads.cfg").set_index("samplename", drop=False)
+samples = pd.read_csv("../manifest.cfg", sep="\t").set_index("uuid", drop=False)  # defines the assembly and polishing strategies
+reads_lookup = pd.read_csv("../reads.cfg", sep="\t").set_index("samplename", drop=False)
 
 # Utility functions
 def input_polish(w, name):
