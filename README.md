@@ -1,5 +1,5 @@
 # reticulatus
-**A snakemake-based pipeline for assembling and polishing long nanopore reads**
+**A snakemake-based pipeline for assembling and polishing long genomes from long nanopore reads**
 
 Reticulatus was developed in part to manage the execution of [long-read mock community experiments](https://lomanlab.github.io/mockcommunity/) at the Loman Lab.
 It turns out that it's quite good, so I've generalised it for any long-read nanopore experiments, so you too can enjoy highly-contiguous, blisteringly fast, cutting-edge assembly and polishing too.
