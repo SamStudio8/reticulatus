@@ -538,18 +538,14 @@ rule download_ktkit_database:
 
 rule kraken:
     input:
-        #fa="{uuid}.{prefix}.fa", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
         fa="{path}", ok=os.path.join(config["kraken2_database_root"], "k2db.ok")
     output:
-        #out="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2",
-        #rep="{uuid,[A-z0-9_-]*}.{prefix}.fa.k2r",
         out="{path}.k2",
         rep="{path}.k2r",
     threads: 8
     resources:
         benchmark=1, # Don't let this RAM pig near our assembly and polishing benchmarks
-    #benchmark: "benchmarks/{uuid,[A-z0-9_-]*}.{prefix}.fa.k2"
-    benchmark: "benchmarks/{path}.k2"
+    #benchmark: "benchmarks/{path}.k2"
     shell:
         "kraken2 --db %s --use-names -t {threads} --output {output.out} --report {output.rep} {input.fa}" % config["kraken2_database_root"]
 
