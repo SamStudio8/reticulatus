@@ -3,7 +3,7 @@
 
 Reticulatus was developed in part to manage the execution of [long-read mock community experiments](https://lomanlab.github.io/mockcommunity/) at the Loman Lab.
 It turns out that it's quite good, so I've generalised it for any long-read nanopore experiments, so you too can enjoy highly-contiguous, blisteringly fast, cutting-edge assembly and polishing too.
-Reticulatus was designed for [assembly of metagenomic data](https://academic.oup.com/gigascience/article/8/5/giz043/5486468), but we have tried it on the [odd isolate too](https://twitter.com/samstudio8/status/1169293404943081473).
+Reticulatus was designed for [assembly of whole-genomes from metagenomic data](https://academic.oup.com/gigascience/article/8/5/giz043/5486468), but we have tried it on the [odd isolate too](https://twitter.com/samstudio8/status/1169293404943081473). Reticulatus is not a 16S metataxonomics analysis pipeline.
 
 Reticulatus **is not** an assembler or polisher, but a [well stacked set of bioinformatics blocks](https://twitter.com/sienkieee/status/1192876481942294530). Reticulatus tries to codify what we at the Loman Lab think is the current best-practice for nanopore bioinformatics into a (hopefully) easy-to-use pipeline, taking advantage of all the goodness of Snakemake while adding a few features; including:
 
