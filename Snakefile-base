@@ -376,8 +376,8 @@ rule minimap2_racon_sam:
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output.s} 2> {log}"
 
 rule minimap2_racon_subsample:
-    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam",
-        bai="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam.bai"
+    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix}racon-{readtype}{depth}-{iteration}.fa.bam",
+        bai="{uuid}.{conf}.ctg.cns.{polishedprefix}racon-{readtype}{depth}-{iteration}.fa.bam.bai"
     output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"),
         fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.reads.fa",
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
@@ -398,7 +398,7 @@ rule minimap2_racon_subsample:
 
 rule polish_racon:
     #input: contigs=input_polish_racon, reads=polish_reads_input, overlaps=lambda w: input_polish_racon(w)+".sam"
-    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa.sam"
+    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix}racon-{readtype}{depth}-{iteration}.fa.sam"
     params:
         cuda=lambda w: "--cudapoa-batches %d" % config["racon_batches"] if n_gpu(w, "polish_gpu") > 0 else "",
         devices=select_gpu_device,
@@ -614,15 +614,15 @@ rule install_bandage_linux:
 
 rule prep_wtdbg2_gfa:
     input:
-        dot="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.dot.gz",
-        assembly="{uuid}.{conf,wtdbg2[A-z0-9_-]*}.ctg.lay.gz"
+        dot="{uuid}.{conf}.ctg.dot.gz",
+        assembly="{uuid}.{conf}.ctg.lay.gz"
     output: "{uuid}.{conf,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
     shell: "zcat {input.dot} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
 
 #NOTE We reduce only the flye GFA because it has too many links to draw, and also the
 # wtdbg2 graph isnt actually representative of the consensus so the contigs dont match up at all
 rule prep_flye_gfa:
-    input: "{uuid}.{conf,flye[A-z0-9_-]*}/assembly_graph.gfa"
+    input: "{uuid}.{conf}/assembly_graph.gfa"
     output: "{uuid}.{conf,flye[A-z0-9._-]*}.ctg.cns.gfa"
     shell: "python ../scripts/reduce_gfa.py {input} 50000 > {output}"
 
