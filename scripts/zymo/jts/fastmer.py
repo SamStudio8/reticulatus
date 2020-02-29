@@ -301,6 +301,8 @@ parser.add_argument('--print-alignment', action='store_true')
 parser.add_argument('--print-identity-per-segment', action='store_true')
 parser.add_argument('--write-edits', type=str, required=False)
 parser.add_argument('--temp-bam', type=str, required=False)
+parser.add_argument('--sort-threads', type=int, required=False, default=1)
+parser.add_argument('--sort-flags', type=str, required=False, default="")
 args = parser.parse_args()
 
 out_bam = args.assembly + ".assembly_analysis.sorted.bam"
@@ -308,10 +310,10 @@ if args.temp_bam:
     out_bam = args.temp_bam
 
 with open(os.devnull, 'wb') as devnull:
-    mm2_cmd = "minimap2 -Y -a -x asm5 %s %s --sam-hit-only | samtools sort -T %s.tmp -o %s -" % (args.reference, args.assembly, out_bam, out_bam)
+    mm2_cmd = "minimap2 -Y -a -x asm5 %s %s --sam-hit-only | samtools sort %s -@ %d -T %s.tmp -o %s -" % (args.reference, args.assembly, args.sort_flags, args.sort_threads, out_bam, out_bam)
     subprocess.check_call(mm2_cmd, stdout=devnull, stderr=devnull, shell=True)
 
-    index_cmd = "samtools index %s" % (out_bam)
+    index_cmd = "samtools index -@ %d %s" % (args.sort_threads, out_bam)
     subprocess.check_call(index_cmd, stdout=devnull, stderr=devnull, shell=True)
 
 # Read variants VCF to ignore as errors
