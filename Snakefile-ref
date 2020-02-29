@@ -149,7 +149,8 @@ rule jts_fastmer:
         res="fastmer-results/{uuid,[A-z0-9_-]*}.{assembly}/{genome}.tsv",
         bam=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam"),
         bai=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam.bai"),
-    shell: "python ../scripts/zymo/jts/fastmer.py --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 --min-alignment-length 10000 | bond - ../manifest.cfg --greedy --append suffix:{wildcards.assembly},refname:{wildcards.genome} > {output.res}"
+    threads: 4
+    shell: "python ../scripts/zymo/jts/fastmer.py --sort-flags '%s' --sort-threads {threads} --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 --min-alignment-length 10000 | bond - ../manifest.cfg --greedy --append suffix:{wildcards.assembly},refname:{wildcards.genome} > {output.res}" % (config["sort_flags"])
 
 rule merge_fastmer:
     input:
