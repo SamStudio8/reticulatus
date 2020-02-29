@@ -331,6 +331,7 @@ if args.write_edits is not None:
 
 # Calculate the number of matching bases from the alignment
 samfile = pysam.AlignmentFile(out_bam)
+reads_consumed = 0
 for read in samfile:
 
     try:
@@ -350,8 +351,13 @@ for read in samfile:
         gather_basic_stats(edits_fp, read, query_aligned, ref_aligned, assembly_accuracy)
         gather_homopolymer_stats(query_aligned, ref_aligned, assembly_accuracy)
 
+        reads_consumed += 1
+
     except ValueError as inst:
         pass
+
+if reads_consumed == 0:
+    raise Exception("No valid alignments found. Try lowering --min-alignment-length or --min-mapping-quality.")
 
 if args.print_identity_per_segment:
     si = assembly_accuracy.get_segment_identities()
