@@ -156,9 +156,9 @@ samples = pd.read_csv("../manifest.cfg", sep="\t").set_index("uuid", drop=False)
 reads_lookup = pd.read_csv("../reads.cfg", sep="\t").set_index("samplename", drop=False)
 
 # Utility functions
-def input_polish(w, name):
+def input_polish(w):
     if int(w.iteration) > 1:
-        contigs = "%s.%s.ctg.cns.%s%s-%s%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, name, w.readtype, w.get("depth", ""), int(w.iteration)-1)
+        contigs = "%s.%s.ctg.cns.%s%s-%s%s-%d.fa" % (w.uuid, w.conf, w.polishedprefix, w.polisher, w.readtype, w.get("depth", ""), int(w.iteration)-1)
     elif w.polishedprefix=="":
         # Polish existing assembly if repolish is set
         polish_uuid = w.uuid
@@ -168,15 +168,6 @@ def input_polish(w, name):
     else:
         contigs = "%s.%s.ctg.cns.%sfa" % (w.uuid, w.conf, w.polishedprefix)
     return contigs
-
-def input_polish_racon(w):
-    return input_polish(w, "racon")
-def input_polish_medaka(w):
-    return input_polish(w, "medaka")
-def input_polish_pilon(w):
-    return input_polish(w, "pilon")
-def input_polish_dehumanizer(w):
-    return input_polish(w, "dehumanizer")
 
 def minimap2_mode(w):
     if w.readtype.startswith("ont"):
@@ -346,7 +337,7 @@ rule rmdup_reads:
 
 
 rule minimap2_polished_bam:
-    input: contigs=lambda w: input_polish(w, w.polisher), reads=align_polish_reads_input
+    input: contigs=input_polish, reads=align_polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
@@ -362,7 +353,7 @@ rule minimap2_polished_bam:
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
 rule minimap2_racon_sam:
-    input: contigs=input_polish_racon, reads=align_polish_reads_input
+    input: contigs=input_polish, reads=align_polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
@@ -397,8 +388,8 @@ rule minimap2_polishing_subsample:
 #    shell: "zcat {input.reads} | seqkit grep -f {input.fql} | pigz > {output}"
 
 rule polish_racon:
-    #input: contigs=input_polish_racon, reads=polish_reads_input, overlaps=lambda w: input_polish_racon(w)+".sam"
-    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.sam"
+    #input: contigs=input_polish, reads=polish_reads_input, overlaps=lambda w: input_polish(w)+".sam"
+    input: contigs=input_polish, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.sam"
     params:
         cuda=lambda w: "--cudapoa-batches %d" % config["racon_batches"] if n_gpu(w, "polish_gpu") > 0 else "",
         devices=select_gpu_device,
@@ -416,7 +407,7 @@ rule polish_racon:
 
 rule polish_medaka:
     singularity: config["medaka_env"],
-    input: contigs=input_polish_medaka, reads=polish_reads_input
+    input: contigs=input_polish, reads=polish_reads_input
     params:
         prefix=lambda w, output: "medaka-%s" % output.fa,
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
@@ -449,7 +440,7 @@ rule download_dehumanizer_database:
 
 rule polish_dehumanizer:
     input:
-        contigs=input_polish_dehumanizer,
+        contigs=input_polish,
         ok=os.path.join(config["dehumanizer_database_root"], "dehuman.ok"),
         manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
     output:
@@ -463,7 +454,7 @@ rule download_pilon:
     shell: "wget https://github.com/broadinstitute/pilon/releases/download/v1.23/pilon-1.23.jar"
 
 rule polish_pilon:
-    input: contigs=input_polish_pilon, reads=polish_reads_input, pilon="pilon-1.23.jar"
+    input: contigs=input_polish, reads=polish_reads_input, pilon="pilon-1.23.jar"
     params:
         mode=minimap2_mode,
     output:
