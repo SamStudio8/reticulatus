@@ -199,8 +199,8 @@ def get_reads(w, readtype, samplename=None):
 def polish_reads_input(w):
     if w.readtype == "ont" and not w.get("depth", None):
         reads = get_reads(w, 'ont')
-    elif w.readtype == "ont" and w.get("depth", None):
-        reads = "%s.%s.ctg.cns.%sracon-%s%s-%s.reads.fa" % (w.uuid, w.conf, w.polishedprefix, w.readtype, w.depth, w.iteration)
+    elif w.readtype.startswith("ont") and w.get("depth", None):
+        reads = "%s.%s.ctg.cns.%s%s-%s%s-%s.reads.fa" % (w.uuid, w.conf, w.polishedprefix, w.polisher, w.readtype, w.depth, w.iteration)
     elif w.readtype == "ill":
         reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
     return reads
@@ -345,19 +345,19 @@ rule rmdup_reads:
         "seqkit rmdup -n -i {input} -o {output.out} -d {output.dup}"
 
 
-rule minimap2_racon_bam:
-    input: contigs=input_polish_racon, reads=align_polish_reads_input
+rule minimap2_polished_bam:
+    input: contigs=lambda w: input_polish(w, w.polisher), reads=align_polish_reads_input
     params:
         mode=minimap2_mode,
         #reads=lambda w, input: input.reads.replace(".gz", ".b.gz")
     threads: lambda w: n_threads(w, "minimap2_threads")
     output:
-        b=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"),
-        bai=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam.bai"),
+        b=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"),
+        bai=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam.bai"),
     resources:
         benchmark=1,
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.^$|.*\.}{polisher,\w+}-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,\w+}{depth,\d*?}-{iteration,\d+}.fa.bam"
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.b} %s -@ {threads} -o {output.b} 2> {log}; samtools index {output.b}" % config["sort_flags"]
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
@@ -370,18 +370,18 @@ rule minimap2_racon_sam:
     resources:
         benchmark=1,
     output:
-        s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"),
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"
+        s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"),
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}racon-{readtype,[A-z]+}-{iteration,\d+}.fa.sam"
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output.s} 2> {log}"
 
-rule minimap2_racon_subsample:
-    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix}racon-{readtype}{depth}-{iteration}.fa.bam",
-        bai="{uuid}.{conf}.ctg.cns.{polishedprefix}racon-{readtype}{depth}-{iteration}.fa.bam.bai"
-    output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"),
-        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.reads.fa",
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
+rule minimap2_polishing_subsample:
+    input: b="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam",
+        bai="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam.bai"
+    output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"),
+        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.reads.fa",
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,\w+}-{readtype,[A-z]+}{depth,\d+}-{iteration,\d+}.fa.sam"
     threads: lambda w: n_threads(w, "minimap2_threads")
     resources:
         benchmark=1,
@@ -398,15 +398,15 @@ rule minimap2_racon_subsample:
 
 rule polish_racon:
     #input: contigs=input_polish_racon, reads=polish_reads_input, overlaps=lambda w: input_polish_racon(w)+".sam"
-    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix}racon-{readtype}{depth}-{iteration}.fa.sam"
+    input: contigs=input_polish_racon, reads=polish_reads_input, overlaps="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.sam"
     params:
         cuda=lambda w: "--cudapoa-batches %d" % config["racon_batches"] if n_gpu(w, "polish_gpu") > 0 else "",
         devices=select_gpu_device,
     output:
-        out="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
-        rtbench="rtbenchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}racon-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
+        out="{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,racon}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
+        rtbench="rtbenchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,racon}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,racon}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,racon}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
     threads: lambda w: n_threads(w, "polish_threads")
     resources:
         gpu=lambda w: n_gpu(w, "polish_gpu"),
@@ -424,13 +424,13 @@ rule polish_medaka:
         devices=select_gpu_device,
         mmi=lambda w, input: temp("%s.mmi" % input.contigs)
     output:
-        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa",
-        chdf=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/consensus_probs.hdf"),
-        cbam=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/calls_to_draft.bam"),
-        cbai=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa/calls_to_draft.bam.bai")
+        fa="{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,medaka}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa",
+        chdf=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,medaka}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa/consensus_probs.hdf"),
+        cbam=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,medaka}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa/calls_to_draft.bam"),
+        cbai=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,medaka}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa/calls_to_draft.bam.bai")
     threads: lambda w: n_threads(w, "polish_threads")
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}medaka-{readtype,\w+}-{iteration,\d+}.fa"
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,medaka}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,medaka}-{readtype,[A-z]+}{depth,\d*?}-{iteration,\d+}.fa"
     resources:
         gpu=lambda w: n_gpu(w, "polish_gpu"),
         benchmark=1,
@@ -453,7 +453,7 @@ rule polish_dehumanizer:
         ok=os.path.join(config["dehumanizer_database_root"], "dehuman.ok"),
         manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
     output:
-        "{uuid}.{conf}.ctg.cns.{polishedprefix,.*}dehumanizer-{readtype,\w+}-{iteration,\d+}.fa"
+        "{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,dehumanizer}-{readtype,\w+}-{iteration,\d+}.fa"
     threads: 2
     shell:
         "dehumanize {input.manifest} {input.contigs} {output}"
@@ -467,12 +467,12 @@ rule polish_pilon:
     params:
         mode=minimap2_mode,
     output:
-        polish="{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
+        polish="{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,pilon}-{readtype,\w+}-{iteration,\d+}.fa"
     threads: lambda w: n_threads(w, "polish_threads")
     resources:
         benchmark=1,
-    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
-    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,.*}pilon-{readtype,\w+}-{iteration,\d+}.fa"
+    benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,pilon}-{readtype,\w+}-{iteration,\d+}.fa"
+    log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix,^$|.*\.}{polisher,pilon}-{readtype,\w+}-{iteration,\d+}.fa"
     shell:
         "minimap2 -t {threads} -ax {params.mode} {input.contigs} {input.reads} > {output}.sam; samtools sort {output}.sam -T {wildcards.uuid} %s -@ {threads} -o {output}.bam; samtools index {output}.bam; java -Xmx16G -jar {input.pilon} --genome {input.contigs} --bam {output}.bam --outdir pilon-{wildcards.uuid}/ 2> {log}; mv pilon-{wildcards.uuid}/pilon.fasta {output}" % config["sort_flags"]
 
