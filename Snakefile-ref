@@ -149,8 +149,10 @@ rule jts_fastmer:
         res="fastmer-results/{uuid,[A-z0-9_-]*}.{assembly}/{genome}.tsv",
         bam=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam"),
         bai=temp("{uuid,[A-z0-9_-]*}.{assembly}.{genome}.assembly_analysis.sorted.bam.bai"),
+    resources:
+        minlen=lambda w, attempt: [50000, 10000, 5000, 0][min(attempt,4) - 1] # Set the default minlen on the first attempt, then give up with 0 on attempt 4+
     threads: 4
-    shell: "python ../scripts/zymo/jts/fastmer.py --sort-flags '%s' --sort-threads {threads} --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 --min-alignment-length 10000 | bond - ../manifest.cfg --greedy --append suffix:{wildcards.assembly},refname:{wildcards.genome} > {output.res}" % (config["sort_flags"])
+    shell: "python ../scripts/zymo/jts/fastmer.py --sort-flags '%s' --sort-threads {threads} --temp-bam {output.bam} --reference {input.reference} --assembly {input.assembly} --min-mapping-quality 10 --min-alignment-length {resources.minlen} | bond - ../manifest.cfg --greedy --append suffix:{wildcards.assembly},refname:{wildcards.genome} > {output.res}" % (config["sort_flags"])
 
 rule merge_fastmer:
     input:
