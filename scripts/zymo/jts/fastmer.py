@@ -359,7 +359,11 @@ for read in samfile:
         pass
 
 if reads_consumed == 0:
-    raise Exception("No valid alignments found. Try lowering --min-alignment-length or --min-mapping-quality.")
+    warning = "No valid alignments found. Try lowering --min-alignment-length or --min-mapping-quality.\n"
+    if args.min_alignment_length == 0:
+        sys.stderr.write(warning)
+    else:
+        raise Exception(warning)
 
 if args.print_identity_per_segment:
     si = assembly_accuracy.get_segment_identities()
