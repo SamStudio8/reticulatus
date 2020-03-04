@@ -344,7 +344,7 @@ rule rmdup_reads:
         "seqkit rmdup -n -i {input} -o {output.out} -d {output.dup}"
 
 
-rule minimap2_prepolish_bam:
+rule minimap2_presubsample_bam:
     input: contigs=input_polish, reads=align_polish_reads_input
     params:
         mode=minimap2_mode,
