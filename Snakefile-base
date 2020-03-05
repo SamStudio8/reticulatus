@@ -358,7 +358,7 @@ rule minimap2_presubsample_bam:
         benchmark=1,
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam"
-    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.b} %s -@ {threads} -o {output.b} 2> {log}; samtools index {output.b}" % config["sort_flags"]
+    shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} | samtools sort -T tmpsort-{output.b} %s -@ {threads} -o {output.b} 2> {log}; samtools index -@ {threads} {output.b}" % config["sort_flags"]
     #shell: "cudamapper -w 10 -t 1000 -i 5000 {params.reads} {input.contigs} > {output}"
 
 rule minimap2_prepolish_fullsample:
@@ -407,9 +407,40 @@ rule polish_racon:
     shell:
         "export CUDA_VISIBLE_DEVICES={params.devices}; racon -m 8 -x -6 -g -8 -w 500 -t {threads} {input.reads} {input.overlaps} {input.contigs} {params.cuda} > {output.out} 2> {log}"
 
+rule prepolish_medaka_override_calls2draft:
+    singularity: config["medaka_env"],
+    input:
+        contigs=input_polish,
+        reads=polish_reads_input,
+    params:
+        prefix=lambda w, output: output.b.replace(".bam", "")
+    output:
+        b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/pre_calls_to_draft.bam"),
+        i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/pre_calls_to_draft.bam.bai")
+    threads: lambda w: n_threads(w, "minimap2_threads")
+    shell: "mini_align -i {input.reads} -r {input.contigs} -p {params.prefix} -t {threads} -m -f" # as in medaka_consensus
+
+#TODO Integrate with other subsample_bam rule
+rule prepolish_medaka_override_calls2draft_subsample:
+    conda: "environments/pomoxis.yaml"
+    input:
+        b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam",
+        i="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam.bai"
+    output:
+        b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/calls_to_draft.bam"),
+        i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/calls_to_draft.bam.bai")
+    threads: lambda w: n_threads(w, "minimap2_threads")
+    resources:
+        benchmark=1,
+    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-override - | samtools sort -T {wildcards.uuid}-B %s -O BAM -o {output.b} -@ {threads}; samtools index -@ {threads} {output.b}" % config["sort_flags"]
+
 rule polish_medaka:
     singularity: config["medaka_env"],
-    input: contigs=input_polish, reads=polish_reads_input
+    input:
+        contigs=input_polish,
+        reads=polish_reads_input,
+        cbam="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam",
+        cbai="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam.bai"
     params:
         prefix=lambda w, output: "medaka-%s" % output.fa,
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
@@ -419,8 +450,6 @@ rule polish_medaka:
     output:
         fa="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa",
         chdf=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/consensus_probs.hdf"),
-        cbam=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam"),
-        cbai=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam.bai")
     threads: lambda w: n_threads(w, "polish_threads")
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa"
@@ -428,7 +457,7 @@ rule polish_medaka:
         gpu=lambda w: n_gpu(w, "polish_gpu"),
         benchmark=1,
     shell:
-        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -rf {params.prefix}/*; rm -f {params.mmi}; SORT='%s' medaka_consensus -i {input.reads} -d {input.contigs} -o {params.prefix} -t {threads} -m {params.model} {params.batch} > {log} 2>&1; mv {params.prefix}/consensus.fasta {output.fa}" % config["sort_flags"]
+        "export CUDA_VISIBLE_DEVICES={params.devices}; export TF_FORCE_GPU_ALLOW_GROWTH=true; rm -f {params.mmi}; SORT='%s' medaka_consensus -i {input.reads} -d {input.contigs} -o {params.prefix} -t {threads} -m {params.model} {params.batch} > {log} 2>&1; mv {params.prefix}/consensus.fasta {output.fa}" % config["sort_flags"]
 
 rule download_dehumanizer_database:
     output:
