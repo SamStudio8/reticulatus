@@ -1,0 +1,9 @@
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python =3.5.2
+  - minimap2
+  - porechop
+  - pip:
+    - git+https://github.com/SamStudio8/pomoxis.git

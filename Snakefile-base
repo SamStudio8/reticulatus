@@ -199,7 +199,8 @@ def polish_reads_input(w):
     if w.readtype == "ont" and not w.get("depth", None):
         reads = get_reads(w, 'ont')
     elif w.readtype.startswith("ont") and w.get("depth", None):
-        reads = "%s.%s.ctg.cns.%s%s-%s%s-%s.reads.fa" % (w.uuid, w.conf, w.polishedprefix, w.polisher, w.readtype, w.depth, w.iteration)
+        reads = get_reads(w, 'ont')
+        #reads = "%s.%s.ctg.cns.%s%s-%s%s-%s.reads.fa" % (w.uuid, w.conf, w.polishedprefix, w.polisher, w.readtype, w.depth, w.iteration)
     elif w.readtype == "ill":
         reads = [get_reads(w, 'i1'), get_reads(w, 'i2')]
     return reads
@@ -375,16 +376,18 @@ rule minimap2_prepolish_fullsample:
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output.s} 2> {log}"
 
 rule minimap2_prepolish_subsample:
+    conda: "environments/pomoxis.yaml"
     input: b="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam",
         bai="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam.bai"
     output: s=temp("{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth,\d+}-{iteration}.fa.sam"),
-        fa="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth,\d+}-{iteration}.reads.fa",
+    #    fa="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth,\d+}-{iteration}.reads.fa",
     benchmark: "benchmarks/{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth,\d+}-{iteration}.fa.sam"
     log: "log/{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth,\d+}-{iteration}.fa.sam"
     threads: lambda w: n_threads(w, "minimap2_threads")
     resources:
         benchmark=1,
-    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
+    #shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
+    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-override - | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
 
 rule polish_racon:
     #input: contigs=input_polish, reads=polish_reads_input, overlaps=lambda w: input_polish(w)+".sam"
