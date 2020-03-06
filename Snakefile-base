@@ -424,8 +424,8 @@ rule prepolish_medaka_override_calls2draft:
 rule prepolish_medaka_override_calls2draft_subsample:
     conda: "environments/pomoxis.yaml"
     input:
-        b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam",
-        i="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam.bai"
+        b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam",
+        i="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam.bai"
     output:
         b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/calls_to_draft.bam"),
         i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/calls_to_draft.bam.bai")
@@ -439,8 +439,8 @@ rule polish_medaka:
     input:
         contigs=input_polish,
         reads=polish_reads_input,
-        cbam="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam",
-        cbai="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam.bai"
+        cbam="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam",
+        cbai="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa/calls_to_draft.bam.bai"
     params:
         prefix=lambda w, output: "medaka-%s" % output.fa,
         model=lambda w: samples.loc[w.uuid]['medakamodel'],
