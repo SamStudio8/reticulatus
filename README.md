@@ -26,10 +26,16 @@ Just so you know, the development of Reticulatus has:
 
 ## How to drive this thing
 
-### (0) Clone the repository where you want the magic to happen
+### (0a) Clone the repository where you want the magic to happen
 
 ```
 git clone https://github.com/SamStudio8/reticulatus.git; cd reticulatus;
+```
+
+### (0b) Install some pre-requisites to build the environment
+
+```
+sudo apt-get install build-essential python3-dev zlib1g-dev
 ```
 
 ### (1) Setup the environment
