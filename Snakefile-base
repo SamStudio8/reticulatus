@@ -439,7 +439,6 @@ rule prepolish_medaka_override_calls2draft_subsample:
     #shell: "subsample_bam_fast {input.b} {wildcards.depth} -t {threads} -o - | samtools sort -T {wildcards.uuid}-B %s -O BAM -o {output.b} -@ {threads}; samtools index -@ {threads} {output.b}" % config["sort_flags"]
 
 rule prepolish_medaka_override_calls2draft_subsample_depth0:
-    conda: "environments/pomoxis-sam.yaml"
     input:
         b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}-{iteration}.fa/pre_calls_to_draft.bam",
         i="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}-{iteration}.fa/pre_calls_to_draft.bam.bai"
