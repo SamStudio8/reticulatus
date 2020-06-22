@@ -376,6 +376,7 @@ rule minimap2_prepolish_fullsample:
     shell: "minimap2 -a -2 --sam-hit-only --secondary=no -Q -t {threads} -x {params.mode} {input.contigs} {input.reads} > {output.s} 2> {log}"
 
 rule minimap2_prepolish_subsample:
+    ##conda: "environments/pomoxis-sam.yaml"
     conda: "environments/pomoxis.yaml"
     input: b="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam",
         bai="{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa.bam.bai"
@@ -386,8 +387,9 @@ rule minimap2_prepolish_subsample:
     threads: lambda w: n_threads(w, "minimap2_threads")
     resources:
         benchmark=1,
-    #shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
-    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-override - | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
+    shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-fasta {output.fa} | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
+    ###shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-override - | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
+    ##shell: "subsample_bam_fast {input.b} {wildcards.depth} -t {threads} -o - 2> {log} | samtools sort -T {wildcards.uuid}-B %s -O SAM -o {output.s} -@ {threads} 2> {log}" % config["sort_flags"]
 
 rule polish_racon:
     #input: contigs=input_polish, reads=polish_reads_input, overlaps=lambda w: input_polish(w)+".sam"
@@ -415,13 +417,14 @@ rule prepolish_medaka_override_calls2draft:
     params:
         prefix=lambda w, output: output.b.replace(".bam", "")
     output:
-        b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/pre_calls_to_draft.bam"),
-        i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d+}-{iteration}.fa/pre_calls_to_draft.bam.bai")
+        b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d*}-{iteration}.fa/pre_calls_to_draft.bam"),
+        i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d*}-{iteration}.fa/pre_calls_to_draft.bam.bai")
     threads: lambda w: n_threads(w, "minimap2_threads")
     shell: "mini_align -i {input.reads} -r {input.contigs} -p {params.prefix} -t {threads} -m -f" # as in medaka_consensus
 
 #TODO Integrate with other subsample_bam rule
 rule prepolish_medaka_override_calls2draft_subsample:
+    #conda: "environments/pomoxis-sam.yaml"
     conda: "environments/pomoxis.yaml"
     input:
         b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}{depth}-{iteration}.fa/pre_calls_to_draft.bam",
@@ -433,6 +436,17 @@ rule prepolish_medaka_override_calls2draft_subsample:
     resources:
         benchmark=1,
     shell: "subsample_bam {input.b} {wildcards.depth} -t {threads} --output-override - | samtools sort -T {wildcards.uuid}-B %s -O BAM -o {output.b} -@ {threads}; samtools index -@ {threads} {output.b}" % config["sort_flags"]
+    #shell: "subsample_bam_fast {input.b} {wildcards.depth} -t {threads} -o - | samtools sort -T {wildcards.uuid}-B %s -O BAM -o {output.b} -@ {threads}; samtools index -@ {threads} {output.b}" % config["sort_flags"]
+
+rule prepolish_medaka_override_calls2draft_subsample_depth0:
+    conda: "environments/pomoxis-sam.yaml"
+    input:
+        b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}-{iteration}.fa/pre_calls_to_draft.bam",
+        i="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher}-{readtype}-{iteration}.fa/pre_calls_to_draft.bam.bai"
+    output:
+        b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}-{iteration}.fa/calls_to_draft.bam"),
+        i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}-{iteration}.fa/calls_to_draft.bam.bai")
+    shell: "ln -s {input.b} {output.b}; ln -s {input.i} {output.i}"
 
 rule polish_medaka:
     singularity: config["medaka_env"],
