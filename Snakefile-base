@@ -445,7 +445,7 @@ rule prepolish_medaka_override_calls2draft_subsample_depth0:
     output:
         b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}-{iteration}.fa/calls_to_draft.bam"),
         i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}-{iteration}.fa/calls_to_draft.bam.bai")
-    shell: "ln -s {input.b} {output.b}; ln -s {input.i} {output.i}"
+    shell: "ln -srf {input.b} {output.b}; ln -srf {input.i} {output.i}"
 
 rule polish_medaka:
     singularity: config["medaka_env"],
