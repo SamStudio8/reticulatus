@@ -652,7 +652,7 @@ rule prep_wtdbg2_gfa:
         dot="{uuid}.{conf}.ctg.dot.gz",
         assembly="{uuid}.{conf}.ctg.lay.gz"
     output: "{uuid}.{conf,wtdbg2[A-z0-9._-]*}.ctg.cns.gfa"
-    shell: "zcat {input.dot} | perl git/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
+    shell: "zcat {input.dot} | perl git/{ wildcards.conf }/wtdbg2/scripts/wtdbg-dot2gfa.pl > {output}"
 
 #NOTE We reduce only the flye GFA because it has too many links to draw, and also the
 # wtdbg2 graph isnt actually representative of the consensus so the contigs dont match up at all
