@@ -417,8 +417,8 @@ rule prepolish_medaka_override_calls2draft:
     params:
         prefix=lambda w, output: output.b.replace(".bam", "")
     output:
-        b=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d*}-{iteration}.fa/pre_calls_to_draft.bam"),
-        i=temp("medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d*}-{iteration}.fa/pre_calls_to_draft.bam.bai")
+        b="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d*}-{iteration}.fa/pre_calls_to_draft.bam",
+        i="medaka-{uuid}.{conf}.ctg.cns.{polishedprefix}{polisher,medaka}-{readtype}{depth,\d*}-{iteration}.fa/pre_calls_to_draft.bam.bai"
     threads: lambda w: n_threads(w, "minimap2_threads")
     shell: "mini_align -i {input.reads} -r {input.contigs} -p {params.prefix} -t {threads} -m -f" # as in medaka_consensus
 
