@@ -224,6 +224,9 @@ def n_threads(w, key=""):
     return n_threads
 
 def n_gpu(w, key=""):
+    if not config.get("cuda"):
+        return 0
+
     import GPUtil
     n_gpu = workflow.global_resources.get('gpu', len(GPUtil.getGPUs()))
     if samples.loc[w.uuid].get("gpu", '-') != '-':
