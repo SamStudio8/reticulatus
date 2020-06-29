@@ -38,7 +38,7 @@ git clone https://github.com/SamStudio8/reticulatus.git; cd reticulatus;
 sudo apt-get install build-essential python3-dev zlib1g-dev
 ```
 
-### (1) Setup the environment
+### (1a) Setup the environment
 
 ```
 conda env create --name reticulatus --file environments/base.yaml
@@ -49,6 +49,18 @@ cp Snakefile-base Snakefile
 You will almost certaintly want the `Snakefile-base` rule set for the time being. Run `Snakefile-ref` with an appropriate `ref.cfg` to replicate our [mock community benchmarking pipeline](https://github.com/LomanLab/mockcommunity).
 
 **Note** It is important that you ensure `snakemake-minimal` package is installed automatically using the environment specified above. Not only is this easier, but makes sure that the version installed is suitable for the overriden `shell.py` that ships with `reticulatus`.
+
+### (1b) Get singularity
+
+Currently, medaka and its components are run inside a singularity container, regardless of whether you are using it on the CPU or GPU.
+Reticulatus does not install singularity for you as it may already be installed and configured by your system adminstrator.
+However, if that is not the case: a suitable version can be installed from conda-forge. Run this conda command in your activated `reticulatus` conda environment.
+
+```
+conda install -c conda-forge singularity
+```
+
+Ensure to use the version from conda-forge, not the base conda, as the older version will be unable to pull images that we have pre-built.
 
 ### (2) Write your configuation
 
@@ -135,16 +147,20 @@ any tools that require a special jail (*e.g.* for `python2`) are run far, far aw
 from everything else.
 Set `j` to the highest number of processes that you can fill with snakes before
 your computer falls over.
+You should specify `--use-conda` and `--use-singularity` to activate the requisite environments for reticulatus to work properly.
+You will also need to bind the working directory to the container as below.
 
-#### Simple
+#### Simple (example)
 
 ```
-snakemake -j <available_threads> --reason
+snakemake -j <available_threads> --reason --use-conda --use-singularity --singularity-args '-B /data/sam-projects/reticulatus-testing/:/data/sam-projects/reticulatus-testing/ -B /path/to/reads/dir/:/path/to/reads/dir/'
 ```
+
+Replace the paths with the location of your reticulatus directory, and your reads.
 
 #### Advanced (GPU)
 
-Additionally you **must** specify `--use-singularity` to use containers **and** provide suitable `--singularity-args` to use the GPU and bind directories. You must bind the directory into which you have cloned reticulatus, as well as any other directories that contain your reads. Set the `dir_inside` and `dir_outside` keys to the same path to ensure the file paths inside the container, match those on the outside of the container.
+Additionally you **must** provide suitable `--singularity-args` to use the GPU and bind directories. You must bind the directory into which you have cloned reticulatus, as well as any other directories that contain your reads. Set the `dir_inside` and `dir_outside` keys to the same path to ensure the file paths inside the container, match those on the outside of the container.
 
 *e.g.* 
 ```
