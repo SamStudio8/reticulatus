@@ -40,8 +40,10 @@ sudo apt-get install build-essential python3-dev zlib1g-dev
 
 ### (1) Setup the environment
 
+You'll want to build an environment from either `base-gpu` or `base-cpu`. There isn't much difference, other than `racon` and `medaka` are absent from the GPU flavour base environment. If you're using the GPU, you'll need to [install Singularity](https://sylabs.io/guides/3.3/user-guide/quick_start.html#quick-installation-steps) yourself for our medaka container to work.
+
 ```
-conda env create --name reticulatus --file environments/base.yaml
+conda env create --name reticulatus --file environments/base-gpu.yaml
 conda activate reticulatus
 cp Snakefile-base Snakefile
 ```
@@ -139,30 +141,33 @@ your computer falls over.
 #### Simple
 
 ```
-snakemake -j <available_threads> --reason
+snakemake -j <available_threads> --reason --use-conda
 ```
 
 #### Advanced (GPU)
 
-Additionally you **must** specify `--use-singularity` to use containers **and** provide suitable `--singularity-args` to use the GPU and bind directories. You must bind the directory into which you have cloned reticulatus, as well as any other directories that contain your reads. Set the `dir_inside` and `dir_outside` keys to the same path to ensure the file paths inside the container, match those on the outside of the container.
+To activate GPU support for reticulatus, you must set the `cuda` key to True in `config.cfg`.
+When invoking Snakemake you can set `--resources gpu=N` where `N` is the number of GPU interfaces you want to use. You can ignore this to use all GPU interfaces.
+
+Currently, the GPU will accelerate the following steps:
+
+* `polish_racon`: you will need a racon binary compiled with `CUDA`, for your system. If you have multiple versions or previously installed racon to your environment, the GPU-enabled version will need to appear on your `$PATH` before any other installed versions of `racon`. You can do this by exporting it to your path *after* activating the conda environment for reticulatus.
+* `polish_medaka`: you can use our singularity container defined in `config.yaml`, use your own, or alternatively, skip containerisation altogether and ensure medaka is appropriately installed to your `$PATH`.
+
+##### GPU Containers
+
+To use singularity containers, you **must** specify `--use-singularity` **and** provide suitable `--singularity-args` to use the GPU (`--nv`) and bind directories (`-B`). You must bind the directory into which you have cloned reticulatus, as well as any other directories that contain your reads. Set the `dir_inside` and `dir_outside` keys to the same path to ensure the file paths inside the container, match those on the outside of the container.
 
 *e.g.* 
 ```
 '--nv -B /data/sam-projects/reticulatus-testing/:/data/sam-projects/reticulatus-testing/ -B /path/to/reads/dir/:/path/to/reads/dir/ -B /path/to/more/reads/dir/:/path/to/more/reads/dir/'
 ```
 
-You should also set `--resources gpu=N` where `N` is the number of GPU interfaces shown in `nvidia-smi`.
-Don't forget to use the GPU, you must set the `cuda` key to True in `config.cfg`.
+For a full invocation example:
 
 ```
 snakemake -j <available_threads> --reason --use-conda --use-singularity --singularity-args '--nv -B <dir_inside>:<dir_outside>' -k --restart-times 1 --resources gpu=N
 ```
-
-Using the GPU will accelerate the following steps:
-
-* `polish_racon`: you will need a racon binary compiled with `CUDA`, for your system and have it appear on your `$PATH` before any other installed versions of `racon`. You can do this by exporting to your path *after* activating the conda environment for reticulatus.
-* `polish_medaka`: you will need to specify an appropriate singularity container in `config.yaml`, or install medaka with GPU support yourself
-
 
 ## Housekeeping
 
