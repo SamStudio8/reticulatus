@@ -13,7 +13,6 @@ dependencies:
   - pandas
   - biopython
   - minimap2
-  - racon
   - seqtk
   - kraken2
   - seqkit
