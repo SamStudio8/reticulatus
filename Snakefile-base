@@ -478,9 +478,9 @@ rule polish_medaka:
 rule download_dehumanizer_database:
     output:
         ok=touch(os.path.join(config["dehumanizer_database_root"], "dehuman.ok")),
-        a=os.path.join(config["dehumanizer_database_root"], "GCA_000786075.2_hs38d1_genomic.fna.mmi"),
-        b=os.path.join(config["dehumanizer_database_root"], "GCA_000001405.27_GRCh38.p12_genomic.fna.mmi"),
-        c=os.path.join(config["dehumanizer_database_root"], "hla_gen.fasta.mmi"),
+        a=os.path.join(config["dehumanizer_database_root"], "GCA_000786075.2_hs38d1_genomic.mmi"),
+        b=os.path.join(config["dehumanizer_database_root"], "GCF_000001405.39_GRCh38.p13_genomic.mmi"),
+        c=os.path.join(config["dehumanizer_database_root"], "ipd-imgt-3_39_0.hla_gen.mmi"),
         manifest=os.path.join(config["dehumanizer_database_root"], "manifest.txt")
     shell:
         "bash ../scripts/download_dehumanizer_refs.sh %s" % config["dehumanizer_database_root"]
