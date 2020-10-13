@@ -53,15 +53,6 @@ rule merge_refs:
         refnames=lambda w: get_ref_names_by_group(w.refgroup)
     shell: "REFS=({input}); NAMES=({params.refnames}); for ((i=0;i<${{#REFS[@]}};++i)); do sed \"s,^>,>${{NAMES[i]}}__,\" ${{REFS[i]}}; done > {output}"
 
-def get_samplename_from_readpath(path):
-    try:
-        return reads_lookup.loc[reads_lookup['ont'] == w.path]["samplename"][0]
-    except:
-        for samplename in reads_lookup["samplename"]:
-            if os.path.basename(path).split(".")[0] == samplename:
-                return samplename
-    raise Exception
-
 rule map_reads:
     input:
         ref="{refgroup}.super_ref.fa",

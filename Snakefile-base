@@ -288,6 +288,16 @@ def enumerate_reads(cols=["ont", "i1", "i2"], suffix="", refgroup=False):
                 read_paths.add(path + group + suffix)
     return read_paths
 
+def get_samplename_from_readpath(path):
+    try:
+        return reads_lookup.loc[reads_lookup['ont'] == w.path]["samplename"][0]
+    except:
+        for samplename in reads_lookup["samplename"]:
+            if os.path.basename(path).split(".")[0] == samplename:
+                return samplename
+    raise Exception
+
+
 
 # TODO samstudio8
 # This function is fired during construction of the DAG when searching the parameter space of the GPU jobs,
@@ -603,10 +613,13 @@ rule ktkit_count:
     input:
         k2o="{path}.k2",
         ok=os.path.join(config["ktkit_database_root"], "ktkit.ok"),
+    params:
+        samplename=lambda w: get_samplename_from_readpath(w.path)
     output:
-        k2k="{path}.k2kc"
+        k2kb="{path}.k2kb",
+        k2kc="{path}.k2kc"
     threads: 1
-    shell: "echo -e 'ktkit_tid\tktkit_name\tmean_seq_len\tn_seq\tprop_seq\tn_seq_unmasked\ttot_bp\tprop_bp\tprop_bp_unmasked' > {output}; ktkit count {input.k2o} --dump %s --rank species >> {output}" % config["ktkit_database_root"]
+    shell: "echo -e 'samplename\tktkit_tid\tktkit_name\tmean_seq_len\tn_seq\tprop_seq\tn_seq_unmasked\ttot_bp\tprop_bp\tprop_bp_unmasked' > {output.k2kb}; ktkit count {input.k2o} --dump %s --rank species | sed 's/^/{params.samplename}\t/' >> {output.k2kb}; bond {output.k2kb} ../reads.cfg --dropid > {output.k2kc}" % config["ktkit_database_root"]
 
 
 # TODO We need to use git/Flye/bin/flye as the script sets up some dir dependent stuff
