@@ -290,7 +290,7 @@ def enumerate_reads(cols=["ont", "i1", "i2"], suffix="", refgroup=False):
 
 def get_samplename_from_readpath(path):
     try:
-        return reads_lookup.loc[reads_lookup['ont'] == w.path]["samplename"][0]
+        return reads_lookup.loc[reads_lookup['ont'] == path]["samplename"][0]
     except:
         for samplename in reads_lookup["samplename"]:
             if os.path.basename(path).split(".")[0] == samplename:
