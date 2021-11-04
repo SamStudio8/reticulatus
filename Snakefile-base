@@ -424,6 +424,7 @@ rule polish_racon:
 
 rule prepolish_medaka_override_calls2draft:
     singularity: config["medaka_env"],
+    conda: "environments/medaka.yaml" if not config["cuda"] else None
     input:
         contigs=input_polish,
         reads=polish_reads_input,
@@ -462,6 +463,7 @@ rule prepolish_medaka_override_calls2draft_subsample_depth0:
 
 rule polish_medaka:
     singularity: config["medaka_env"],
+    conda: "environments/medaka.yaml" if not config["cuda"] else None
     input:
         contigs=input_polish,
         reads=polish_reads_input,
