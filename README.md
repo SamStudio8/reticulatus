@@ -68,7 +68,7 @@ Replace the YAML keys as appropriate. Keys are:
 | `slack_token` | str, optional | if you want to be bombarded with slack messages regarding the success and failure of your snakes, insert a suitable bot API token here |
 | `slack_channel` | str, optional | if using a `slack_token`, enter the name of the channel to send messages, including the leading `#` |
 | `cuda` | boolean | set to `False` if you do not want GPU-acceleration and `True` if you have the means to go very fast (*i.e.* you have a CUDA-compatible GPU) |
-| `medaka_env` | URI | path to a singularity image (simg) or sandbox container to run medaka (CPU or GPU) |
+| `medaka_env` | URI | path to a singularity image (simg) or sandbox container to run medaka (GPU only as conda env will interfere with simg on CPU mode) |
 | `racon_batches`| int | number of simultaneous batches to process on GPU |
 | `polish_threads` | int | number of CPU threads to use for any polishing step |
 | `polish_gpu` | int | number of GPU devices to use for any on-GPU polishing step |
@@ -168,6 +168,10 @@ For a full invocation example:
 ```
 snakemake -j <available_threads> --reason --use-conda --use-singularity --singularity-args '--nv -B <dir_inside>:<dir_outside>' -k --restart-times 1 --resources gpu=N
 ```
+
+## Notes
+
+* Reticulatus is currently pinned to `medaka v0.11.5` (a fine vintage)
 
 ## Housekeeping
 
