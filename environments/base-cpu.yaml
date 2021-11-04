@@ -4,6 +4,7 @@ channels:
 dependencies:
   - snakemake-minimal =5.8.1
   - python =3.6
+  - pandas =1.1.5
   - bcftools =1.13
   - samtools =1.13
   - pysam =0.17.0
